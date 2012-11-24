@@ -1,0 +1,4 @@
+*~
+*.o
+*.cf
+fpga/usb_fpga_iCEcube2/usb_fpga_iCEcube2_Implmnt/

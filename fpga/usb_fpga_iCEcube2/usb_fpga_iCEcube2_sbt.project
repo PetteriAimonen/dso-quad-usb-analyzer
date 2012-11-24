@@ -1,0 +1,56 @@
+[Project]
+Version=SiliconBlue Tech iCEcube - Release: 2011.12.19577 - Build Date: Feb 9 2012 12:48:12
+ProjectName=usb_fpga_iCEcube2
+Vendor=SiliconBlue
+ProjectVFiles=../../usb_rx_phy.vhdl,../../usb_decoder.vhdl,../../edge_matcher.vhdl,../../config.vhdl,../../fpga_top.vhdl,../../fifo.vhdl
+ProjectCFiles=../../timing_contraints.sdc
+CurImplementation=usb_fpga_iCEcube2_Implmnt
+Implementations=usb_fpga_iCEcube2_Implmnt
+StartFromSynthesis=yes
+IPGeneration=false
+
+[tool options]
+PlacerEffortLevel=std
+PlacerAutoLutCascade=yes
+PlacerAutoRamCascade=yes
+RouteWithTimingDriven=yes
+RouteWithPinPermutation=yes
+BitmapSPIFlashMode=yes
+BitmapRAM4KInit=yes
+BitmapInitRamBank=1111
+BitmapOscillatorFR=low
+BitmapEnableWarmBoot=yes
+BitmapSetSecurity=no
+BitmapSetNoUsedIONoPullup=no
+FloorPlannerShowFanInNets=yes
+FloorPlannerShowFanOutNets=yes
+HookTo3rdPartyTextEditor=
+
+[usb_fpga_iCEcube2_Implmnt]
+DeviceFamily=iCE65
+Device=L04
+DevicePackage=VQ100
+DevicePower=T
+NetlistFile=usb_fpga_iCEcube2_Implmnt/usb_fpga_iCEcube2.edf
+AdditionalEDIFFile=
+IPEDIFFile=
+DesignLib=usb_fpga_iCEcube2_Implmnt/sbt/netlist/oadb-fpga_top
+DesignView=_rt
+DesignCell=fpga_top
+SynthesisSDCFile=usb_fpga_iCEcube2_Implmnt/usb_fpga_iCEcube2.scf
+UserPinConstraintFile=
+UserSDCFile=
+PhysicalConstraintFile=../../pin_mapping.pcf
+BackendImplPathName=
+Devicevoltage=1.14
+DevicevoltagePerformance=+/-5%(datasheet default)
+DeviceTemperature=70
+TimingAnalysisBasedOn=Worst
+OperationRange=Commercial
+TypicalCustomTemperature=25
+WorstCustomTemperature=70
+BestCustomTemperature=0
+IOBankVoltages=topBank,2.5 bottomBank,2.5 leftBank,2.5 rightBank,2.5
+derValue=1.26748
+TimingPathNumberStick=0
+
