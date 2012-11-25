@@ -1,6 +1,6 @@
-VHDL_SOURCE = config.vhdl edge_matcher.vhdl \
+VHDL_SOURCE = config.vhdl edge_matcher.vhdl config.vhdl \
 	fifo.vhdl usb_rx_phy.vhdl usb_decoder.vhdl \
-	fpga_top.vhdl
+	packet_filter.vhdl fpga_top.vhdl
 
 all: syntax_check run_tbs
 
@@ -24,8 +24,12 @@ tb_edge_matcher: edge_matcher.vhdl tb_edge_matcher.vhdl
 	ghdl -a $(GHDL_ARGS) $^
 	ghdl -e $(GHDL_ARGS) $@
 
-run_tbs: tb_usb_decoder tb_fifo tb_edge_matcher
+tb_packet_filter: packet_filter.vhdl tb_packet_filter.vhdl
+	ghdl -a $(GHDL_ARGS) $^
+	ghdl -e $(GHDL_ARGS) $@
+
+run_tbs: tb_usb_decoder tb_fifo tb_edge_matcher tb_packet_filter
 	./tb_usb_decoder
 	./tb_fifo
 	./tb_edge_matcher
-
+	./tb_packet_filter

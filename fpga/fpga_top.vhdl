@@ -36,10 +36,21 @@ architecture rtl of fpga_top is
     
     -- Configuration register signals
     signal cfg_read_count:      std_logic;
+    signal cfg_ign_SOF:         std_logic;
+    signal cfg_ign_IN:          std_logic;
+    signal cfg_ign_OUT:         std_logic;
+    signal cfg_ign_PRE:         std_logic;
+    signal cfg_ign_ACK:         std_logic;
+    signal cfg_ign_NAK:         std_logic;
     
     -- USB decoder signals
     signal dec_data:            std_logic_vector(8 downto 0);
     signal dec_write:           std_logic;
+    
+    -- Packet filter signals
+    signal filt_filter:         std_logic_vector(15 downto 0);
+    signal filt_data:           std_logic_vector(8 downto 0);
+    signal filt_write:          std_logic;
     
     -- FIFO outputs
     signal fifo_data_out:       std_logic_vector(8 downto 0);
@@ -61,7 +72,8 @@ begin
     -- Configuration register
     config1: entity work.Config
         port map (clk, rst_n, fsmc_ce, fsmc_nwr, fsmc_db, 
-            cfg_read_count);
+            cfg_read_count, cfg_ign_SOF, cfg_ign_IN, cfg_ign_OUT,
+            cfg_ign_PRE, cfg_ign_ACK, cfg_ign_NAK);
     
     -- Binarization of ADC data.
     -- In 200mV range, din >= 128 gives 1 V threshold voltage
@@ -80,11 +92,27 @@ begin
             ch_ab_matched(1), ch_ab_matched(0), ch_ab_matched(1),
             dec_data, dec_write);
     
+    -- Packet filter
+    filt1: entity work.PacketFilter
+        port map (clk, rst_n, filt_filter, dec_data, dec_write,
+            filt_data, filt_write);
+    
+    -- Filtered packet types
+    filt_filter <= (
+        1 => cfg_ign_OUT,
+        2 => cfg_ign_ACK,
+        5 => cfg_ign_SOF,
+        9 => cfg_ign_IN,
+        10 => cfg_ign_NAK,
+        12 => cfg_ign_PRE,
+        others => '0'
+    );
+    
     -- FIFO storage of data
     fifo1: entity work.FIFO
         generic map (width_g => 9, depth_g => fifo_depth_g)
         port map (clk, rst_n, fifo_data_out, fifo_read,
-            dec_data, dec_write, fifo_count);
+            filt_data, filt_write, fifo_count);
     
     -- Remove values from FIFO on rising edge of fsmc_nrd
     process (clk, rst_n)

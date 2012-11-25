@@ -1,14 +1,15 @@
 #-- Synopsys, Inc.
 #-- Project file Z:\dso-quad-usb-analyzer\fpga\usb_fpga_iCEcube2\usb_fpga_iCEcube2\usb_fpga_iCEcube2_syn.prj
 #project files
-add_file -vhdl -lib work "../../usb_rx_phy.vhdl"
-add_file -vhdl -lib work "../../usb_decoder.vhdl"
-add_file -vhdl -lib work "../../edge_matcher.vhdl"
-add_file -vhdl -lib work "../../config.vhdl"
-add_file -vhdl -lib work "../../fpga_top.vhdl"
-add_file -vhdl -lib work "../../fifo.vhdl"
-add_file -constraint -lib work "../../timing_contraints.sdc"
 
+add_file -vhdl -lib work "../usb_rx_phy.vhdl"
+add_file -vhdl -lib work "../usb_decoder.vhdl"
+add_file -vhdl -lib work "../edge_matcher.vhdl"
+add_file -vhdl -lib work "../config.vhdl"
+add_file -vhdl -lib work "../fpga_top.vhdl"
+add_file -vhdl -lib work "../fifo.vhdl"
+add_file -vhdl -lib work "../packet_filter.vhdl"
+add_file -constraint -lib work "../timing_contraints.sdc"
 #implementation: "usb_fpga_iCEcube2_Implmnt"
 impl -add usb_fpga_iCEcube2_Implmnt -type fpga
 
