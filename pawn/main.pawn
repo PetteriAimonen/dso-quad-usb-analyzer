@@ -7,12 +7,17 @@ bool: @idle()
 {
     if (decoder_count())
     {
-        while (decoder_count())
+        // Pay attention to GUI every 100 packets or whenever buffer is empty.
+        for (new i = 0; i < 100; i++)
         {
             packet_fetch();
+            
+            if (!decoder_count())
+                break;
         }
         
-        display_redraw();
+        if (!peek_keys(SCROLL2_LEFT | SCROLL2_RIGHT))
+            display_redraw();
     }
     
     return !get_keys(BUTTON4);
