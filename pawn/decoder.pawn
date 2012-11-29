@@ -1,0 +1,122 @@
+/// Subroutines for interfacing with the decoder block on USB.FPG fpga image.
+
+#include <fpga>
+
+#define FPGA_IMAGE "USB.FPG"
+
+const decoderconf: {
+    READ_FIFO_COUNT = 0x0001, // Read the count register (instead of data)
+    IGNORE_SOF      = 0x0100,
+    IGNORE_IN       = 0x0200,
+    IGNORE_OUT      = 0x0400,
+    IGNORE_PRE      = 0x0800,
+    IGNORE_ACK      = 0x1000,
+    IGNORE_NAK      = 0x2000
+}
+
+new decoderconf: DECODER_CONFIG = IGNORE_SOF | IGNORE_PRE;
+
+/// Load the FPGA image and initialize it.
+bool: decoder_initialize()
+{
+    while (!f_exists(FPGA_IMAGE))
+    {
+        if (show_dialog("Please copy " ... FPGA_IMAGE ... " to the USB drive.",
+            "OK", "", "", "Exit") == 3)
+        {
+            return false;
+        }
+    }
+
+    if (!fpga_load(FPGA_IMAGE))
+    {
+        show_msgbox("Failed to load " ... FPGA_IMAGE ... " to the FPGA!");
+        return false;
+    }
+    
+    // Configure FPGA clock at 72 MHz
+    wavein_samplerate(72000000);
+    
+    // Capture logic for channels A & B expects 200mV range.
+    config_chA(ADC_DC, ADC_200mV, .offset = 0);
+    config_chB(ADC_DC, ADC_200mV, .offset = 0);
+    
+    decoder_reset();
+    
+    return true;
+}
+
+/// Reset the FPGA
+decoder_reset()
+{
+    // PB1 is our reset pin, toggle it low to reset the FPGA
+    fpga_config_outputs(PB1);
+    fpga_clear_pin(PB1);
+    fpga_set_pin(PB1);
+    
+    decoder_set_config(DECODER_CONFIG);
+}
+
+/// Set the contents of the decoder configuration register
+decoder_set_config(decoderconf: value)
+{
+    DECODER_CONFIG = value;
+    
+    new buffer[1];
+    buffer[0] = value;
+    fpga_write(buffer);
+}
+
+decoder_count()
+{
+    new buffer[1];
+    decoder_set_config(DECODER_CONFIG | READ_FIFO_COUNT);
+    fpga_read(buffer, 1);
+    return buffer[0];
+}
+
+/// Read data from decoder, returns number of items read.
+decoder_read(buffer[], max_count = sizeof buffer)
+{
+    new count = decoder_count();
+    
+    if (count > max_count) count = max_count;
+    if (count == 0) return 0;
+    
+    decoder_set_config(DECODER_CONFIG & ~READ_FIFO_COUNT);
+    fpga_read(buffer, count);
+    return count;
+}
+
+static temp_buffer[64];
+static bytes_in_temp = 0;
+static temp_idx = 0;
+
+/// Read up to N bytes, but terminate if the packet ends.
+/// Returns true if packet ended, false if truncated.
+/// Last byte of packet will be the end-of-packet token.
+bool: decoder_read_packet(buffer{}, &length, start_pos = 0, max_length = sizeof buffer)
+{
+    length = 0;
+    while(length < max_length)
+    {
+        while (bytes_in_temp == temp_idx)
+        {
+            bytes_in_temp = decoder_read(temp_buffer);
+            temp_idx = 0;
+        }
+        
+        while (temp_idx < bytes_in_temp)
+        {
+            new value = temp_buffer[temp_idx];
+            buffer{start_pos + length} = value;
+            length++;
+            temp_idx++;
+            
+            if (value & 0x100)
+                return true; // End-of-packet
+        }
+    }
+    return false; // max_length exceeded
+}
+

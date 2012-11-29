@@ -1,0 +1,83 @@
+/// Subroutines for interfacing with the decoder block on USB.FPG fpga image.
+
+#include <fpga>
+
+#define FPGA_IMAGE "USB.FPG"
+
+const decoderconf: {
+    READ_FIFO_COUNT = 0x0001, // Read the count register (instead of data)
+    IGNORE_SOF      = 0x0100,
+    IGNORE_IN       = 0x0200,
+    IGNORE_OUT      = 0x0400,
+    IGNORE_PRE      = 0x0800,
+    IGNORE_ACK      = 0x1000,
+    IGNORE_NAK      = 0x2000
+}
+
+decoderconf: DECODER_CONFIG = 0xFF00;
+
+/// Load the FPGA image and initialize it.
+bool: decoder_initialize()
+{
+    while (!f_exists(FPGA_IMAGE))
+    {
+        if (show_dialog("Please copy " ... FPGA_IMAGE ... " to the USB drive.",
+            "OK", "", "", "Exit") == 3)
+        {
+            return false;
+        }
+    }
+
+    if (!fpga_load(FPGA_IMAGE))
+    {
+        show_msgbox("Failed to load " ... FPGA_IMAGE ... " to the FPGA!");
+        return false;
+    }
+    
+    // Configure FPGA clock at 72 MHz
+    wavein_samplerate(72000000);
+    
+    // Capture logic for channels A & B expects 200mV range.
+    config_chA(ADC_DC, ADC_200mV, .offset = 0);
+    config_chB(ADC_DC, ADC_200mV, .offset = 0);
+    
+    decoder_reset();
+    
+    return true;
+}
+
+/// Reset the FPGA
+decoder_reset()
+{
+    // PB1 is our reset pin, toggle it low to reset the FPGA
+    fpga_config_outputs(PB1);
+    fpga_clear_pin(PB1);
+    fpga_set_pin(PB1);
+    
+    fpga_set_config(DECODER_CONFIG);
+}
+
+/// Set the contents of the decoder configuration register
+decoder_set_config(value)
+{
+    DECODER_CONFIG = value;
+    
+    new buffer[1];
+    buffer[0] = value;
+    fpga_write(buffer);
+}
+
+/// Read data from decoder, returns number of items read.
+decoder_read(buffer[], max_count = sizeof buffer)
+{
+    decoder_set_config(DECODER_CONFIG | READ_FIFO_COUNT);
+    fpga_read(buffer, 1);
+    new count = buffer[0];
+    
+    if (count > max_count) count = max_count;
+    if (count == 0) return 0;
+    
+    decoder_set_config(DECODER_CONFIG & ~READ_FIFO_COUNT);
+    fpga_read(buffer, count);
+    return count;
+}

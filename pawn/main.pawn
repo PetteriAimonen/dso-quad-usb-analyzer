@@ -1,0 +1,27 @@
+#include "decoder.pawn"
+#include "packet_buffer.pawn"
+#include "packet_analysis.pawn"
+#include "packet_display.pawn"
+
+bool: @idle()
+{
+    if (decoder_count())
+    {
+        while (decoder_count())
+        {
+            packet_fetch();
+        }
+        
+        display_redraw();
+    }
+    
+    return !get_keys(BUTTON4);
+}
+
+main()
+{
+    decoder_initialize();
+    
+    draw_menubar("", "", "", "Quit");
+    return 0;
+}

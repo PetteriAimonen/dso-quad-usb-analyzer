@@ -1,0 +1,79 @@
+/// Scrollable list of packets.
+
+static selected_index = 0;
+
+/// Background and foreground colors for each packet type
+static const Color: packetcolors[][] = [
+    [red, black],               // PT_INVALID
+    [RGB(128, 64, 0), white],   // PT_OUT
+    [black, green],             // PT_ACK
+    [black, white],             // PT_DATA0
+    [black, white],             // PT_PING, not USB1.1
+    [gray, black],              // PT_SOF
+    [black, white],             // PT_NYET, not USB1.1
+    [black, white],             // PT_DATA2, not USB1.1
+    [black, white],             // PT_SPLIT, not USB1.1
+    [darkgreen, white],         // PT_IN
+    [black, red],               // PT_NAK
+    [black, white],             // PT_DATA1
+    [gray, black],              // PT_PRE
+    [darkblue, white],          // PT_SETUP
+    [black, white]              // PT_MDATA, not USB1.1
+];
+
+/// Re-render given row of display (0 to 14)
+display_render_row(row)
+{
+    new top_index = selected_index - 7;
+    if (top_index < 0) top_index = 0;
+    
+    new index = top_index + row;
+    new y = 210 - row * fontheight;
+    
+    if (!packet_valid(index))
+    {
+        fill_rectangle(0, y, screenwidth, fontheight, black);
+        return;
+    }
+    
+    new packettype: type = analyze_packet_type(index);
+    new buf{50};
+    analyze_oneline(index, buf);
+    strrpad(buf, 50);
+    
+    new Color: bgcolor = packetcolors[type][0];
+    new Color: fgcolor = packetcolors[type][1];
+    
+    if (index == selected_index)
+    {
+        bgcolor = blend(bgcolor, white, FIX(0.3));
+        fgcolor = blend(fgcolor, white, FIX(0.3));
+    }
+    
+    draw_text(buf, 0, y, fgcolor, bgcolor);
+}
+
+display_redraw()
+{
+    if (!packet_valid(selected_index))
+        selected_index = packet_get_oldest();
+    
+    for (new i = 0; i < 15; i++)
+    {
+        display_render_row(i);
+    }
+}
+
+@scroll2(delta)
+{
+    if (delta > 0 && packet_valid(selected_index + 1))
+    {
+        selected_index++;
+    }
+    else if (delta < 0 && packet_valid(selected_index - 1))
+    {
+        selected_index--;
+    }
+    
+    display_redraw();
+}

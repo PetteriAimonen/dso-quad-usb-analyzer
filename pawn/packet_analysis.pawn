@@ -1,0 +1,220 @@
+/// Functions for getting textual descriptions of packets.
+
+#define DETAILS_LENGTH 256
+
+const packettype:
+{
+    PT_INVALID = 0,
+    PT_OUT = 1,
+    PT_ACK = 2,
+    PT_DATA0 = 3,
+    PT_PING = 4, // Not USB1.1
+    PT_SOF = 5,
+    PT_NYET = 6, // Not USB1.1
+    PT_DATA2 = 7, // Not USB1.1
+    PT_SPLIT = 8, // Not USB1.1
+    PT_IN = 9,
+    PT_NAK = 10,
+    PT_DATA1 = 11,
+    PT_PRE = 12,
+    PT_SETUP = 13,
+    PT_STALL = 14,
+    PT_MDATA = 15 // Not USB1.1
+}
+
+new packettype_strings[]{} = [
+    "INVAL",
+    "OUT",
+    "ACK",
+    "DATA0",
+    "PING",
+    "SOF",
+    "NYET",
+    "DATA2",
+    "SPLIT",
+    "IN",
+    "NAK",
+    "DATA1",
+    "PRE",
+    "SETUP",
+    "STALL",
+    "MDATA"
+];
+
+/// Get the packet type
+packettype: analyze_packet_type(index)
+{
+    new buf{1};
+    if (!packet_read(index, buf, 0,1))
+        return PT_INVALID;
+    
+    if (((~buf{0} >> 4) & 0x0F) != (buf{0} & 0x0F))
+        return PT_INVALID; // Corrupted packet id
+    
+    return packettype: (buf{0} & 0x0F)
+}
+
+/*******************************************************************
+ * Detailed packet contents analysis                               *
+ *******************************************************************/
+
+/* Detailed analysis for setup packets */
+static bool: describe_setup(buf{DETAILS_LENGTH}, index)
+{
+    if (analyze_packet_type(index) != PT_DATA0)
+        return false;
+    
+    if (analyze_packet_type(index - 1) != PT_SETUP)
+        return false;
+    
+    if (packet_length(index) != 12) // 8 bytes payload
+        return false;
+    
+    new packet{8};
+    packet_read(index, packet, 1, 8);
+    
+    new request = (packet{1} << 8) | packet{0};
+    new value = (packet{3} << 8) | packet{2};
+    new indexv = (packet{5} << 8) | packet{4};
+    new length = (packet{7} << 8) | packet{6};
+    
+    buf{0} = 0;
+    switch (request)
+    {
+        case 0x0080:
+            strcat(buf, "Get status");
+        
+        case 0x0100:
+        {
+            strcat(buf, "Clear feature ");
+            strcat(buf, str(value));
+        }
+        
+        case 0x0300:
+        {
+            strcat(buf, "Set feature ");
+            strcat(buf, str(value));
+        }
+        
+        case 0x0500:
+        {
+            strcat(buf, "Set address ");
+            strcat(buf, str(value));
+        }
+        
+        case 0x0680:
+        {
+            strcat(buf, "Get descriptor ");
+            strcat(buf, str(value >> 8));
+            strcat(buf, " type ");
+            strcat(buf, str(value & 0xFF));
+            if (indexv != 0)
+            {
+                strcat(buf, " lang ");
+                strcat(buf, str(indexv));
+            }
+            strcat(buf, " length ");
+            strcat(buf, str(length));
+        }
+        
+        case 0x0700:
+        {
+            strcat(buf, "Set descriptor ");
+            strcat(buf, str(value));
+            strcat(buf, " index ");
+            strcat(buf, str(indexv));
+            strcat(buf, " length ");
+            strcat(buf, str(length));
+        }
+        
+        case 0x0880:
+            strcat(buf, "Get configuration");
+        
+        case 0x0900:
+        {
+            strcat(buf, "Set configuration ");
+            strcat(buf, str(value));
+        }
+        
+        default:
+            return false;
+    }
+    
+    return true;
+}
+
+bool: packet_describe(buf{DETAILS_LENGTH}, index)
+{
+    return describe_setup(buf, index);
+}
+
+/*****************************************************************
+ * Formatting of packet descriptions for display                 *
+ *****************************************************************/
+
+/// Get one-line description of a packet
+analyze_oneline(index, buf{50})
+{
+    new packettype: type;
+    new packet{16};
+    new tmp{16};
+    new description{DETAILS_LENGTH};
+    new length = packet_length(index);
+    type = analyze_packet_type(index);
+    
+    // Line examples:
+    // 012345678901234567890123456789012345678901234567890
+    // IN     addr 1, endp 4
+    // DATA0  00 01 02 03 ... 15 bytes   
+    
+    buf{0} = 0
+    strcat(buf, " ");
+    strcat(buf, packettype_strings[type]);
+    strrpad(buf, 7);
+    
+    if (type == PT_IN || type == PT_OUT || type == PT_SETUP)
+    {
+        new addr, endp;
+        packet_read(index, packet, 1, 2);
+        
+        addr = packet{0} & 0x7F;
+        endp = ((packet{0} & 0x80) >> 7) | ((packet{1} & 0x07) << 1);
+        
+        strcat(buf, "addr ");
+        strcat(buf, str(addr));
+        strcat(buf, ", endp ");
+        strcat(buf, str(endp));
+    }
+    else if (packet_describe(description, index))
+    {
+        strcat(buf, description);
+    }
+    else if (type == PT_DATA0 || type == PT_DATA1)
+    {
+        new payload_len = length - 4; // Minus packet type, 16-bit crc, eop
+        new count = min(payload_len, 8);
+        packet_read(index, packet, 1, count);
+            
+        for (new i = 0; i < count; i++)
+        {
+            valstr(tmp, packet{i}, .base = 16, .minlength = 2);
+            strcat(buf, tmp);
+            strcat(buf, " ");
+        }
+        
+        if (payload_len > count)
+        {
+            strcat(buf, "... total ");
+            strcat(buf, str(payload_len));
+        }
+    }
+    
+    // Append error indicators
+    packet_read(index, packet, length - 1, 1);
+    if (packet{0} & 0x01)
+    {
+        buf{39} = 0;
+        strrpad(buf, 40);
+        strcat(buf, "PHY ERR");
+    }
+}
