@@ -18,7 +18,9 @@ static const Color: packetcolors[][] = [
     [black, white],             // PT_DATA1
     [gray, black],              // PT_PRE
     [darkblue, white],          // PT_SETUP
-    [black, white]              // PT_MDATA, not USB1.1
+    [black, red],               // PT_STALL
+    [black, white],             // PT_MDATA, not USB1.1
+    [red, white]                // PT_RESET
 ];
 
 /// Re-render given row of display (0 to 14)
@@ -57,6 +59,13 @@ display_redraw()
 {
     if (!packet_valid(selected_index))
         selected_index = packet_get_oldest();
+    
+    if (selected_index < 0)
+    {
+        draw_text("Ready to capture some USB packets!", 200, 160, white, black, true);
+        draw_text("Channel A = D-, Channel B = D+", 200, 140, white, black, true);
+        return;
+    }
     
     for (new i = 0; i < 15; i++)
     {

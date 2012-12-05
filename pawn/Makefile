@@ -7,7 +7,7 @@ clean:
 	rm -f usb.amx
 
 usb.amx: main.pawn *.pawn
-	$(PAWNCC) -o$@ -d2 -v2 -V1 $<
+	$(PAWNCC) -o$@ -d2 -v2 $<
 
 deploy: usb.amx
 	todrive /mnt/dso usb.amx

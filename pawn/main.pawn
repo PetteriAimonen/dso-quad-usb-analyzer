@@ -7,8 +7,8 @@ bool: @idle()
 {
     if (decoder_count())
     {
-        // Pay attention to GUI every 100 packets or whenever buffer is empty.
-        for (new i = 0; i < 100; i++)
+        // Pay attention to GUI every 1000 packets or whenever buffer is empty.
+        for (new i = 0; i < 1000; i++)
         {
             packet_fetch();
             
@@ -27,6 +27,7 @@ main()
 {
     decoder_initialize();
     
+    display_redraw();
     draw_menubar("", "", "", "Quit");
     return 0;
 }

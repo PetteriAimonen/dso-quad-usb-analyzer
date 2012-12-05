@@ -6,6 +6,7 @@
 -- end-of-packet token encodes the following information:
 --
 -- bit 0: If 1, a PHY-level error occurred
+-- bit 1: If 1, a USB reset has occurred
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -37,11 +38,25 @@ architecture rtl of USBDecoder is
     signal phy_enable:  std_logic; -- Enable receiver
     signal phy_state:   std_logic_vector(1 downto 0); -- Status on the input lines
     
-    -- Whether any errors have occurred
-    signal active_r:    std_logic; -- Packet ongoing
+    -- Bits in the EOP token
     signal errors_r:    std_logic; -- Errors during this packet
+    signal reset_r:     std_logic; -- USB reset has occurred
+    
+    -- Detection of USB reset
+    signal reset_cnt_r: integer range 0 to 180;
+    
+    -- Registers for block outputs
     signal data_out_r:  std_logic_vector(8 downto 0);
     signal write_r:     std_logic;
+
+    -- Millisecond counter for the timestamp
+    signal prescaler_r:  integer range 0 to 72000;
+    signal timestamp_r:  unsigned(31 downto 0);
+    signal packettime_r: std_logic_vector(31 downto 0);
+    
+    -- State machine for writing the packet.
+    type State is (IDLE, PAYLOAD, TIME1, TIME2, TIME3, TIME4, EOP);
+    signal state_r: State;
 begin
     phy1: entity work.usb_rx_phy
         port map(
@@ -66,31 +81,90 @@ begin
     process (clk, rst_n)
     begin
         if rst_n = '0' then
-            active_r <= '0';
             errors_r <= '0';
+            reset_r <= '0';
+            reset_cnt_r <= 0;
             data_out_r <= (others => '0');
             write_r <= '0';
+            timestamp_r <= (others => '0');
+            packettime_r <= (others => '0');
+            prescaler_r <= 0;
+            state_r <= IDLE;
         elsif rising_edge(clk) then
-            if active_r = '0' then
-                active_r <= phy_active;
-                errors_r <= '0';
-                write_r <= '0';
-                data_out_r <= (others => '-');
+            if prescaler_r = 71999 then
+                prescaler_r <= 0;
+                timestamp_r <= timestamp_r + 1;
             else
-                if phy_active = '1' then
+                prescaler_r <= prescaler_r + 1;
+            end if;
+        
+            -- Monitor line state to detect USB reset
+            if reset_r = '1' then
+                -- Wait for the reset to get reported
+            elsif reset_cnt_r = 180 then -- 2.5 us
+                reset_r <= '1';
+                reset_cnt_r <= 0;
+            elsif dplus = '1' or dminus = '1' then
+                reset_cnt_r <= 0;
+            else
+                reset_cnt_r <= reset_cnt_r + 1;
+            end if;
+        
+            -- State machine controls the packet writing.
+            case state_r is
+                when IDLE =>
+                    -- Prepare for start of packet
+                    write_r <= '0';
+                    data_out_r <= (others => '-');
+                    packettime_r <= std_logic_vector(timestamp_r);
+                    
+                    if phy_active = '1' then
+                        state_r <= PAYLOAD;
+                    end if;
+                
+                    if (dplus = '1' or dminus = '1') and reset_r = '1' then
+                        -- Report the USB reset when it ends
+                        state_r <= TIME1;
+                    end if;
+                
+                when PAYLOAD =>
                     -- Move packet data to output
                     data_out_r <= "0" & phy_data;
                     write_r <= phy_valid;
                     errors_r <= errors_r or phy_error;
-                    active_r <= '1';
-                else
-                    -- End of packet token
-                    data_out_r <= "10000000" & errors_r;
+                
+                    if phy_active = '0' then
+                        state_r <= TIME1;
+                    end if;
+                
+                when TIME1 =>
+                    data_out_r <= "0" & packettime_r(7 downto 0);
                     write_r <= '1';
-                    active_r <= '0';
+                    state_r <= TIME2;
+                
+                when TIME2 =>
+                    data_out_r <= "0" & packettime_r(15 downto 8);
+                    write_r <= '1';
+                    state_r <= TIME3;
+                
+                when TIME3 =>
+                    data_out_r <= "0" & packettime_r(23 downto 16);
+                    write_r <= '1';
+                    state_r <= TIME4;
+                
+                when TIME4 =>
+                    data_out_r <= "0" & packettime_r(31 downto 24);
+                    write_r <= '1';
+                    state_r <= EOP;
+                
+                when EOP => 
+                    -- End of packet token
+                    data_out_r <= "1000000" & reset_r & errors_r;
+                    write_r <= '1';
                     errors_r <= '0';
-                end if;
-            end if;
+                    reset_r <= '0';
+                    state_r <= IDLE;
+            end case;
         end if;
     end process;
 end architecture;

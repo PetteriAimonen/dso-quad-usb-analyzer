@@ -26,7 +26,7 @@ architecture testbench of tb_usb_decoder is
         
     -- Output packet
     subtype OutValue is std_logic_vector(8 downto 0);
-    type OutArray is array(7 downto 0) of OutValue;
+    type OutArray is array(15 downto 0) of OutValue;
     signal buffer_r:    OutArray;
 begin
     dec1: entity work.USBDecoder
@@ -65,8 +65,10 @@ begin
         
         rst_n <= '1';
         
-        clock;
-        clock;
+        -- 1 millisecond delay to test timestamp
+        for i in 0 to 72000 loop
+            clock;
+        end loop;
         
         -- Test simple packet decoding
         idx_v := 0;
@@ -80,11 +82,31 @@ begin
         clock_fs(6);
         clock_fs(6);
         
-        assert idx_v = 4 report "Packet length is wrong";
+        assert idx_v = 8 report "Packet length is wrong";
         assert buffer_r(0) = "0" & X"A5" report "Byte 1 wrong";
         assert buffer_r(1) = "0" & X"11" report "Byte 2 wrong";
         assert buffer_r(2) = "0" & X"5A" report "Byte 3 wrong";
-        assert buffer_r(3) = "1" & X"00" report "EOP wrong";
+        assert buffer_r(3) = "0" & X"01" report "Time 1 wrong";
+        assert buffer_r(4) = "0" & X"00" report "Time 2 wrong";
+        assert buffer_r(5) = "0" & X"00" report "Time 3 wrong";
+        assert buffer_r(6) = "0" & X"00" report "Time 4 wrong";
+        assert buffer_r(7) = "1" & X"00" report "EOP wrong";
+        
+        -- Test USB reset detection
+        dplus <= '0';
+        dminus <= '0';
+        
+        idx_v := 0;
+        for i in 0 to 1000 loop
+            clock_fs(6);
+            
+            if i > 100 then
+                dplus <= '1';
+            end if;
+        end loop;
+        
+        assert idx_v = 5 report "Reset packet length is wrong";
+        assert buffer_r(4) = "1" & X"02" report "Reset EOP wrong";
         
         report "Simulation ended" severity note;
         wait;

@@ -19,7 +19,11 @@ const packettype:
     PT_PRE = 12,
     PT_SETUP = 13,
     PT_STALL = 14,
-    PT_MDATA = 15 // Not USB1.1
+    PT_MDATA = 15, // Not USB1.1
+    
+    // Rest of the types are special, i.e. not real
+    // USB packets but rather information from decoder.
+    PT_RESET = 16
 }
 
 new packettype_strings[]{} = [
@@ -38,13 +42,22 @@ new packettype_strings[]{} = [
     "PRE",
     "SETUP",
     "STALL",
-    "MDATA"
+    "MDATA",
+    "RESET"
 ];
 
 /// Get the packet type
 packettype: analyze_packet_type(index)
 {
     new buf{1};
+    if (packet_length(index) == 5)
+    {
+        // Just the timestamp and EOP token
+        assert(packet_read(index, buf, 4, 1));
+        if (buf{0} & 0x02)
+            return PT_RESET;
+    }
+    
     if (!packet_read(index, buf, 0,1))
         return PT_INVALID;
     
@@ -67,7 +80,7 @@ static bool: describe_setup(buf{DETAILS_LENGTH}, index)
     if (analyze_packet_type(index - 1) != PT_SETUP)
         return false;
     
-    if (packet_length(index) != 12) // 8 bytes payload
+    if (packet_length(index) != 16) // 8 bytes payload
         return false;
     
     new packet{8};
@@ -169,10 +182,28 @@ analyze_oneline(index, buf{50})
     
     buf{0} = 0
     strcat(buf, " ");
-    strcat(buf, packettype_strings[type]);
-    strrpad(buf, 7);
     
-    if (type == PT_IN || type == PT_OUT || type == PT_SETUP)
+    valstr(tmp, packet_timestamp(index));
+    strpad(tmp, 6);
+    
+    strcat(buf, tmp);
+    strcat(buf, " ");
+    strcat(buf, packettype_strings[type]);
+    strrpad(buf, 14);
+    
+    if (type == PT_INVALID)
+    {
+        new count = min(length, 8);
+        assert(packet_read(index, packet, 0, count));
+            
+        for (new i = 0; i < count; i++)
+        {
+            valstr(tmp, packet{i}, .base = 16, .minlength = 2);
+            strcat(buf, tmp);
+            strcat(buf, " ");
+        }
+    }
+    else if (type == PT_IN || type == PT_OUT || type == PT_SETUP)
     {
         new addr, endp;
         packet_read(index, packet, 1, 2);
@@ -191,7 +222,7 @@ analyze_oneline(index, buf{50})
     }
     else if (type == PT_DATA0 || type == PT_DATA1)
     {
-        new payload_len = length - 4; // Minus packet type, 16-bit crc, eop
+        new payload_len = length - 8; // Minus packet type, 16-bit crc, timestamp, eop
         new count = min(payload_len, 8);
         packet_read(index, packet, 1, count);
             
