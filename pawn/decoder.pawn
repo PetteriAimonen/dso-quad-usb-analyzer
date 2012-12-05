@@ -106,7 +106,7 @@ bool: decoder_read_packet(buffer{}, &length, start_pos = 0, max_length = sizeof 
             temp_idx = 0;
         }
         
-        while (temp_idx < bytes_in_temp)
+        while (temp_idx < bytes_in_temp && length < max_length)
         {
             new value = temp_buffer[temp_idx];
             buffer{start_pos + length} = value;
