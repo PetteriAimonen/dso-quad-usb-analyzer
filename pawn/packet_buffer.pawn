@@ -8,7 +8,7 @@ static const packet_data_mask = 4095;
 
 /// Index of captured packets (start positions and packet lengths)
 static packet_index_start_pos[256];
-static packet_index_length[256];
+static packet_index_length[256]; // Low word = length, high word = repeats
 static const packet_index_len = 256;
 static const packet_index_mask = 255;
 
@@ -17,6 +17,12 @@ static const packet_index_mask = 255;
 /// to index into the packet buffer.
 static packet_index_write_ptr = 0;
 static packet_data_write_ptr = 0;
+
+/// When repeated packets are coalesced, some data in packet_data{} may
+/// be overwritten but not actually used. This counter stores the oldest
+/// non-overwritten data location.
+static packet_index_erase_ptr = 0;
+static packet_data_erase_ptr = 0;
 
 /// Fetch a packet from the decoder and add it to the packet buffer.
 /// Returns index of the new packet.
@@ -33,28 +39,38 @@ packet_fetch()
         assert(decoder_read_packet(packet_data, length2, 0, packet_data_len));
         length += length2;
     }
-    packet_data_write_ptr += length;
+    packet_data_erase_ptr = max(packet_data_erase_ptr,
+                                packet_data_write_ptr + length);
     
     new index = (packet_index_write_ptr & packet_index_mask);
     packet_index_start_pos[index] = start_pos;
-    packet_index_length[index] = length;
+    packet_index_length[index] = (1 << 16) | length;
     packet_index_write_ptr++;
+    packet_index_erase_ptr = max(packet_index_write_ptr,
+                                 packet_index_erase_ptr);
+    packet_data_write_ptr += length;
     
-    return index;
+    // Check if this was a repeat of previous packets
+    collapse_repeats(1);
+    collapse_repeats(2);
+    
+    return packet_index_write_ptr - 1;
 }
 
 /// Check if a packet index is still valid
 bool: packet_valid(index)
 {
     if (index < 0 || index >= packet_index_write_ptr)
-        return false;
+        return false; // Such a packet has never existed
     
-    if (index + packet_index_len < packet_index_write_ptr)
+    if (index + packet_index_len < packet_index_erase_ptr)
         return false; // Index has been overwritten
     
-    new start_pos = packet_index_start_pos[index & packet_index_mask];
-    if (start_pos + packet_data_len < packet_data_write_ptr)
-        return false;
+    index &= packet_index_mask;
+    new start_pos = packet_index_start_pos[index];
+    new length = packet_index_length[index] & 0xFFFF;
+    if (start_pos + length > packet_data_erase_ptr)
+        return false; // Data has been overwritten
     
     return true;
 }
@@ -86,7 +102,18 @@ packet_length(index)
     
     index &= packet_index_mask;
     
-    return packet_index_length[index];
+    return packet_index_length[index] & 0xFFFF;
+}
+
+/// Get packet repeat count
+packet_repeats(index)
+{
+    if (!packet_valid(index))
+        return 0;
+    
+    index &= packet_index_mask;
+    
+    return packet_index_length[index] >> 16;
 }
 
 /// Get packet bytes
@@ -97,7 +124,7 @@ bool: packet_read(index, buf{}, start, length)
     
     index &= packet_index_mask;
     
-    if (start + length > packet_index_length[index])
+    if (start + length > packet_index_length[index] & 0xFFFF)
         return false;
     
     new pos = packet_index_start_pos[index] + start;
@@ -120,3 +147,75 @@ packet_timestamp(index)
     return buf{0} | (buf{1} << 8) | (buf{2} << 8) | (buf{3} << 8);
 }
 
+/**********************************************
+ * Collapsing of packet sequences             *
+ **********************************************/
+
+/// Compare the data contents of two packets
+static bool: data_equals(index1, index2)
+{
+    new length = packet_length(index1);
+    if (length != packet_length(index2))
+        return false;
+    
+    new str1 = packet_index_start_pos[index1 & packet_index_mask];
+    new str2 = packet_index_start_pos[index2 & packet_index_mask];
+    for (new i = 0; i < length; i++)
+    {
+        // Compare everything except timestamp
+        if (i >= length - 5 && i < length - 1)
+            continue;
+        
+        new val1 = packet_data{(str1 + i) & packet_data_mask};
+        new val2 = packet_data{(str2 + i) & packet_data_mask};
+        if (val1 != val2)
+            return false;
+    }
+    
+    return true;
+}
+
+/// Remove newest packet from buffer. Used to condense repeats.
+static packet_remove()
+{
+    new index = packet_index_write_ptr - 1;
+    packet_data_write_ptr -= packet_length(index);
+    packet_index_write_ptr--;
+}
+
+/// Check if sequence of N latest packets repeats
+static bool: check_repeats(count)
+{
+    new newest = packet_index_write_ptr - 1;
+    for (new i = 0; i < count; i++)
+    {
+        new idx1 = newest - i;
+        new idx2 = idx1 - count;
+        
+        if (!packet_valid(idx2))
+            return false;
+        
+        if (!data_equals(idx1, idx2))
+            return false;
+    }
+    
+    return true;
+}
+
+/// Collapse a sequence of N latest packets, if it repeats
+static collapse_repeats(count)
+{
+    if (!check_repeats(count))
+        return;
+    
+    for (new i = 0; i < count; i++)
+    {
+        packet_remove();
+    }
+    
+    for (new i = 0; i < count; i++)
+    {
+        new idx = packet_index_write_ptr - 1 - i;
+        packet_index_length[idx & packet_index_mask] += 0x10000;
+    }
+}

@@ -248,4 +248,14 @@ analyze_oneline(index, buf{50})
         strrpad(buf, 40);
         strcat(buf, "PHY ERR");
     }
+    
+    // Append repeat count
+    new repeats = packet_repeats(index);
+    if (repeats > 1)
+    {
+        buf{39} = 0;
+        strrpad(buf, 40);
+        strcat(buf, "x");
+        strcat(buf, str(repeats));
+    }
 }
