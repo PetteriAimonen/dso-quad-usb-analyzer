@@ -30,7 +30,7 @@ display_render_row(row)
     if (top_index < 0) top_index = 0;
     
     new index = top_index + row;
-    new y = 210 - row * fontheight;
+    new y = 206 - row * fontheight;
     
     if (!packet_valid(index))
     {
@@ -82,6 +82,11 @@ display_redraw()
     else if (delta < 0 && packet_valid(selected_index - 1))
     {
         selected_index--;
+    }
+    else if (delta == 0)
+    {
+        // Scroller click
+        details_show(selected_index);
     }
     
     display_redraw();

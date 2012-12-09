@@ -24,8 +24,17 @@ static packet_data_write_ptr = 0;
 static packet_index_erase_ptr = 0;
 static packet_data_erase_ptr = 0;
 
+/// Clear packet buffer
+buffer_clear()
+{
+    packet_index_erase_ptr = 0;
+    packet_index_write_ptr = 0;
+    packet_data_erase_ptr = 0;
+    packet_data_write_ptr = 0;
+    decoder_reset();
+}
+
 /// Fetch a packet from the decoder and add it to the packet buffer.
-/// Returns index of the new packet.
 packet_fetch()
 {
     new length;
@@ -53,8 +62,6 @@ packet_fetch()
     // Check if this was a repeat of previous packets
     collapse_repeats(1);
     collapse_repeats(2);
-    
-    return packet_index_write_ptr - 1;
 }
 
 /// Check if a packet index is still valid
@@ -76,6 +83,7 @@ bool: packet_valid(index)
 }
 
 /// Get index of oldest valid packet
+/// If there are no packets, returns -1.
 packet_get_oldest()
 {
     if (packet_index_write_ptr == 0)
@@ -92,6 +100,13 @@ packet_get_oldest()
     
     assert(packet_valid(index));
     return index;
+}
+
+/// Get index of newest packet.
+/// If there are no packets, returns -1.
+packet_get_newest()
+{
+    return packet_index_write_ptr - 1;
 }
 
 /// Get packet length
@@ -147,6 +162,16 @@ packet_timestamp(index)
     return buf{0} | (buf{1} << 8) | (buf{2} << 8) | (buf{3} << 8);
 }
 
+/// Remove newest packet from buffer. Used to condense repeats and/or
+/// to filter packets.
+packet_remove()
+{
+    new index = packet_get_newest();
+    assert(packet_valid(index));
+    packet_data_write_ptr -= packet_length(index);
+    packet_index_write_ptr--;
+}
+
 /**********************************************
  * Collapsing of packet sequences             *
  **********************************************/
@@ -173,14 +198,6 @@ static bool: data_equals(index1, index2)
     }
     
     return true;
-}
-
-/// Remove newest packet from buffer. Used to condense repeats.
-static packet_remove()
-{
-    new index = packet_index_write_ptr - 1;
-    packet_data_write_ptr -= packet_length(index);
-    packet_index_write_ptr--;
 }
 
 /// Check if sequence of N latest packets repeats
@@ -219,3 +236,4 @@ static collapse_repeats(count)
         packet_index_length[idx & packet_index_mask] += 0x10000;
     }
 }
+

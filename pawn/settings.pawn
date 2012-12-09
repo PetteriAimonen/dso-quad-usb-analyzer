@@ -1,0 +1,56 @@
+#include <config>
+
+static bool: filter_sof;
+static bool: filter_pre;
+
+const addrfiltmode: {
+    ADDRFILT_NONE = 0,
+    ADDRFILT_SETADDR = 1,
+    ADDRFILT_RANGE = 2,
+    ADDRFILT_RANGE0 = 3
+}
+
+static addrfiltmode: addrfilt_mode;
+static minaddr, maxaddr;
+
+static addrfilt_mode_labels[]{} = ["None", "Auto (setaddr)", "Range", "Range + addr 0"];
+
+configure(bool: load_only = false)
+{
+    start_config("usb.ini", load_only);
+
+    while (do_config())
+    {
+        config_boolean("filter_sof", "Filter SOF packets",
+            filter_sof, true,
+            .help = "USB transmits Start Of Frame packets once every 1 ms. Often they are not very interesting, so you can filter them out.");
+        
+        config_boolean("filter_pre", "Filter PRE packets",
+            filter_pre, true,
+            .help = "PREamble packets signify low-speed communication. This program doesn't support decoding them yet, so you probably want to filter them.");
+        
+        config_multichoice("addrfilt_mode", "Address filter mode",
+            addrfilt_mode, addrfilt_mode_labels, ADDRFILT_SETADDR,  .count = 3,
+            .help = "If there are many devices on the same root hub port, packets send by the host to any device will be visible. Filtering by the device address helps here." ... "\n\nAutomatic mode will filter to the newest enumerated device." ...
+            "\nRange will just compare the address to a range you set." ...
+            "\nRange + addr 0 additionally always allows address 0 through, so that you can see the enumeration.");
+        
+        if (addrfilt_mode == ADDRFILT_RANGE
+            || addrfilt_mode == ADDRFILT_RANGE0
+            || config_state != config_edit)
+        {
+            config_integer("minaddr", "Minimum address", minaddr, 0, 0, 127);
+            config_integer("maxaddr", "Maximum address", maxaddr, 127, 0, 127);
+        }
+    }
+    
+    DECODER_CONFIG = decoderconf: 0;
+    if (filter_sof) DECODER_CONFIG |= IGNORE_SOF;
+    if (filter_pre) DECODER_CONFIG |= IGNORE_PRE;
+}
+
+@button3()
+{
+    configure();
+    redraw_all();
+}

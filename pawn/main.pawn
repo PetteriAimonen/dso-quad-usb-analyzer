@@ -2,6 +2,8 @@
 #include "packet_buffer.pawn"
 #include "packet_analysis.pawn"
 #include "packet_display.pawn"
+#include "packet_details.pawn"
+#include "settings.pawn"
 
 bool: @idle()
 {
@@ -23,11 +25,72 @@ bool: @idle()
     return !get_keys(BUTTON4);
 }
 
+redraw_all()
+{
+    display_redraw();
+    draw_menubar("Save", "Reset", "Config", "Quit");
+}
+
+@button1()
+{
+    get_keys(ANY_KEY);
+    draw_menubar("TXT", "BMP", "", "");
+    while (!peek_keys(BUTTON1 | BUTTON2)) { }
+    
+    if (get_keys(BUTTON1))
+    {
+        new filename{14} = "USB%03d.TXT";
+        select_filename(filename);
+        draw_menubar("Saving", "", filename);
+        
+        new File: file = f_open(filename, FA_CREATE_NEW | FA_WRITE);
+        
+        new index = packet_get_oldest();
+        while (packet_valid(index))
+        {
+            new buf{50};
+            analyze_oneline(index, buf);
+            f_write(file, buf);
+            f_write(file, "\r\n");
+            index++;
+        }
+        
+        if (f_close(file))
+            draw_menubar("Saved", filename);
+        else
+            draw_menubar("File error!");
+        
+        delay_ms(500);
+    }
+    else if (get_keys(BUTTON2))
+    {
+        new filename{14} = "USB%03d.BMP";
+        select_filename(filename);
+        draw_menubar("Saving", "", filename);
+        
+        if (save_bitmap(filename))
+            draw_menubar("Saved ", "", filename);
+        else
+            draw_menubar("Bitmap save failed!");
+        
+        delay_ms(500);
+    }
+    
+    redraw_all();
+    get_keys(ANY_KEY);
+}
+
+@button2()
+{
+    buffer_clear();
+    redraw_all();
+}
+
 main()
 {
+    configure(.load_only = true);
     decoder_initialize();
     
-    display_redraw();
-    draw_menubar("", "", "", "Quit");
+    redraw_all();
     return 0;
 }

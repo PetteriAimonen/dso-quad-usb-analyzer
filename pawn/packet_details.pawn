@@ -1,0 +1,108 @@
+/// Modal dialog for the details of one packet.
+static details_redraw(index, &ypos)
+{
+    clear_screen();
+    draw_menubar("OK", "Save", "", "");
+    
+    // Draw title row
+    {
+        new buf{50};
+        analyze_oneline(index, buf);
+        strrpad(buf, 50);
+        
+        draw_text(buf, 0, 220 - fontheight, white, darkblue);
+    }
+    
+    // Print packet details, if any
+    {
+        new buf{DETAILS_LENGTH};
+        if (packet_describe(buf, index))
+        {
+            draw_flowtext(buf, 0, 100, screenwidth, 100);
+        }
+    }
+    
+    // Print packet hex dump
+    {
+        new length = packet_length(index) - 5; // Skip EOP, timestamp
+        
+        ypos = min(ypos, length / 8 - 2);
+        ypos = max(ypos, 0);
+        
+        for (new i = 0; i < 7; i++)
+        {
+            new y = 86 - i * fontheight;
+            new offset = (ypos + i) * 8;
+            new count = min(length - offset, 8);
+            
+            if (count <= 0)
+                break;
+            
+            new packet{9};
+            if (!packet_read(index, packet, offset, count))
+                break;
+            
+            new hexdump{32} = "";
+            new ascii{9};
+            for (new j = 0; j < 8; j++)
+            {
+                 new tmp{4};
+                 valstr(tmp, packet{j}, .base = 16, .minlength = 2);
+                 strcat(hexdump, tmp);
+                 strcat(hexdump, " ");
+                 
+                 if (packet{j} == 0 || packet{j} > 128)
+                     ascii{j} = ' ';
+                 else
+                     ascii{j} = packet{j};
+            }
+            ascii{9} = 0;
+            
+            draw_text(hexdump, 8, y);
+            draw_text(ascii, 300, y);
+        }
+    }
+}
+
+/// Loop for the modal dialog.
+details_show(index)
+{
+    new ypos = 0;
+    details_redraw(index, ypos);
+    while (!get_keys(BUTTON1))
+    {
+        // Poll the decoder, to avoid buffer overflowing
+        while (decoder_count() != 0)
+        {
+            packet_fetch();
+        }
+        
+        if (peek_keys(SCROLL2_RIGHT | SCROLL2_LEFT))
+        {
+            if (get_keys(SCROLL2_RIGHT))
+                ypos++;
+            
+            if (get_keys(SCROLL2_LEFT))
+                ypos--;
+            
+            details_redraw(index, ypos);
+        }
+        
+        if (get_keys(BUTTON2))
+        {
+            new filename{14} = "USB%03d.BMP";
+            select_filename(filename);
+            draw_menubar("Saving", "", filename);
+            
+            if (save_bitmap(filename))
+                draw_menubar("Saved ", "", filename);
+            else
+                draw_menubar("Bitmap save failed!");
+            
+            delay_ms(500);
+            details_redraw(index, ypos);
+        }
+    }
+    
+    redraw_all();
+}
