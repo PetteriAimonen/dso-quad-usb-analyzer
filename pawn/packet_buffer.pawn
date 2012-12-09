@@ -48,20 +48,24 @@ packet_fetch()
         assert(decoder_read_packet(packet_data, length2, 0, packet_data_len));
         length += length2;
     }
-    packet_data_erase_ptr = max(packet_data_erase_ptr,
-                                packet_data_write_ptr + length);
+    
+    packet_data_write_ptr += length;
+    if (packet_data_erase_ptr < packet_data_write_ptr)
+        packet_data_erase_ptr = packet_data_write_ptr;
     
     new index = (packet_index_write_ptr & packet_index_mask);
     packet_index_start_pos[index] = start_pos;
     packet_index_length[index] = (1 << 16) | length;
     packet_index_write_ptr++;
-    packet_index_erase_ptr = max(packet_index_write_ptr,
-                                 packet_index_erase_ptr);
-    packet_data_write_ptr += length;
+    if (packet_index_erase_ptr < packet_index_write_ptr)
+        packet_index_erase_ptr = packet_index_write_ptr;
     
     // Check if this was a repeat of previous packets
-    collapse_repeats(1);
-    collapse_repeats(2);
+    if (check_repeats(1))
+        collapse_repeats(1);
+    
+    if (check_repeats(2))
+        collapse_repeats(2);
 }
 
 /// Check if a packet index is still valid
@@ -188,8 +192,8 @@ static bool: data_equals(index1, index2)
     for (new i = 0; i < length; i++)
     {
         // Compare everything except timestamp
-        if (i >= length - 5 && i < length - 1)
-            continue;
+        if (i == length - 5)
+            i = length - 1;
         
         new val1 = packet_data{(str1 + i) & packet_data_mask};
         new val2 = packet_data{(str2 + i) & packet_data_mask};
@@ -201,16 +205,13 @@ static bool: data_equals(index1, index2)
 }
 
 /// Check if sequence of N latest packets repeats
-static bool: check_repeats(count)
+static check_repeats(count)
 {
     new newest = packet_index_write_ptr - 1;
     for (new i = 0; i < count; i++)
     {
         new idx1 = newest - i;
         new idx2 = idx1 - count;
-        
-        if (!packet_valid(idx2))
-            return false;
         
         if (!data_equals(idx1, idx2))
             return false;
@@ -222,9 +223,6 @@ static bool: check_repeats(count)
 /// Collapse a sequence of N latest packets, if it repeats
 static collapse_repeats(count)
 {
-    if (!check_repeats(count))
-        return;
-    
     for (new i = 0; i < count; i++)
     {
         packet_remove();
