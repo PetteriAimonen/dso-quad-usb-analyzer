@@ -28,6 +28,10 @@ tb_packet_filter: packet_filter.vhdl tb_packet_filter.vhdl
 	ghdl -a $(GHDL_ARGS) $^
 	ghdl -e $(GHDL_ARGS) $@
 
+tb_packet_buffer: fifo.vhdl ramblock.vhdl packet_buffer.vhdl tb_packet_buffer.vhdl
+	ghdl -a $(GHDL_ARGS) $^
+	ghdl -e $(GHDL_ARGS) $@
+
 run_tbs: tb_usb_decoder tb_fifo tb_edge_matcher tb_packet_filter
 	./tb_usb_decoder
 	./tb_fifo
