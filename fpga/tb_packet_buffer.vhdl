@@ -29,6 +29,7 @@ begin
     
     -- The packet buffer being tested
     buf0: entity work.PacketBuffer
+        generic map (timeout_g => 1024)
         port map (clk, rst_n, data_in, write_in, data_out, write_out, cmd, arg, busy, status);
     
     process
@@ -119,9 +120,11 @@ begin
         
         start_cmd(READ, "00");
         wait_complete;
+        assert status = '1' report "READ failed";
         
         start_cmd(WRITE, "00");
         wait_complete;
+        assert status = '1' report "WRITE failed";
         
         verify_packet(X"01000000AAAAAA00");
         
@@ -129,9 +132,11 @@ begin
         start_cmd(READ, "10");
         write_packet(X"1122334455667788", 5);
         wait_complete;
+        assert status = '1' report "READ failed";
         
         start_cmd(WRITE, "10");
         wait_complete;
+        assert status = '1' report "WRITE failed";
         
         verify_packet(X"1122334455667788");
         
@@ -147,6 +152,100 @@ begin
         wait_complete;
         
         assert status = '1' report "Packets should compare equal";
+        
+        start_cmd(DROP, "00"); wait_complete;
+        start_cmd(DROP, "01"); wait_complete;
+        
+        -- Test CMP when packets differ (in EOP)
+        write_packet(X"0000000055667788");
+        start_cmd(READ, "00");
+        wait_complete;
+        assert status = '1' report "READ failed";
+        write_packet(X"1111111155667789");
+        start_cmd(READ, "11");
+        wait_complete;
+        assert status = '1' report "READ failed";
+        
+        start_cmd(CMP, "11");
+        wait_complete;
+        
+        assert status = '0' report "Packets should compare different";
+        
+        start_cmd(DROP, "00"); wait_complete;
+        start_cmd(DROP, "11"); wait_complete;
+        
+        -- Test SHIFT and FLAGR
+        start_cmd(SHIFT, "01");
+        wait_complete;
+        
+        write_packet(X"5555555511223300");
+        start_cmd(READ, "00");
+        wait_complete;
+        assert status = '1' report "READ failed";
+        
+        start_cmd(SHIFT, "01");
+        wait_complete;
+        
+        start_cmd(FLAGR, "01");
+        wait_complete;
+        
+        start_cmd(WRITE, "01");
+        wait_complete;
+        assert status = '1' report "WRITE failed";
+        
+        verify_packet(X"5555555511223304");
+        
+        -- Test overlong packets and FLUSH
+        start_cmd(READ, "00");
+        write_in <= '1';
+        for i in 0 to 255 loop
+            data_in <= "0" & std_logic_vector(to_unsigned(i, 8));
+            clock;
+        end loop;
+        data_in <= "1" & X"00";
+        clock;
+        write_in <= '0';
+        
+        wait_complete;
+        assert status = '0' report "Packet shouldn't fit in buffer";
+        
+        start_cmd(FLUSH, "00");
+        
+        for i in 0 to 255 loop
+            while unsigned(fifo_count) = 0 loop
+                clock;
+            end loop;
+            
+            assert fifo_out = "0" & std_logic_vector(to_unsigned(i, 8))
+                report "Wrong byte at position " & integer'image(i);
+            
+            fifo_read <= '1';
+            clock;
+            fifo_read <= '0';
+            clock;
+            clock;
+        end loop;
+        
+        while unsigned(fifo_count) = 0 loop
+            clock;
+        end loop;
+        assert fifo_out = "1" & X"00" report "Wrong EOP";
+        fifo_read <= '1';
+        clock;
+        fifo_read <= '0';
+        clock;
+        clock;
+        
+        wait_complete;
+        clock;
+        clock;
+        
+        assert unsigned(fifo_count) = 0 report "Unexpected data";
+        
+        -- Test packet reading timeout
+        start_cmd(READ, "00");
+        wait_complete;
+        assert status = '0' report "Read should timeout";
         
         wait;
     end process;

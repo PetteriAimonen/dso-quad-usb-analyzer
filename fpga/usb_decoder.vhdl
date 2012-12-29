@@ -11,6 +11,7 @@
 --
 -- bit 0: If 1, a PHY-level error occurred
 -- bit 1: If 1, a USB reset has occurred
+-- bit 2: If 1, repeating sequence starts
 
 library ieee;
 use ieee.std_logic_1164.all;

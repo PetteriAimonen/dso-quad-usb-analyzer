@@ -2,10 +2,12 @@ VHDL_SOURCE = config.vhdl edge_matcher.vhdl config.vhdl \
 	fifo.vhdl usb_rx_phy.vhdl usb_decoder.vhdl \
 	packet_filter.vhdl fpga_top.vhdl
 
+TESTS = tb_usb_decoder tb_fifo tb_edge_matcher tb_packet_filter tb_packet_buffer
+
 all: syntax_check run_tbs
 
 clean:
-	rm *.o *.cf
+	rm *.o *.cf $(TESTS)
 
 # ----- GHDL simulator -----
 
@@ -32,8 +34,9 @@ tb_packet_buffer: fifo.vhdl ramblock.vhdl packet_buffer.vhdl tb_packet_buffer.vh
 	ghdl -a $(GHDL_ARGS) $^
 	ghdl -e $(GHDL_ARGS) $@
 
-run_tbs: tb_usb_decoder tb_fifo tb_edge_matcher tb_packet_filter
+run_tbs: $(TESTS)
 	./tb_usb_decoder
 	./tb_fifo
 	./tb_edge_matcher
 	./tb_packet_filter
+	./tb_packet_buffer

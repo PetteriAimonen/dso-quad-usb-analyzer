@@ -89,7 +89,7 @@ begin
             data_out_r <= buffer_r(to_integer(read_pos_r));
             
             -- Increment read position unless fifo is already empty
-            if read = '1' and read_pos_r /= write_pos_r then
+            if read = '1' and count_r /= 0 then
                 read_pos_r <= read_pos_r + 1;
             end if;
             
