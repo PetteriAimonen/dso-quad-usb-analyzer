@@ -55,6 +55,9 @@ architecture rtl of PacketBuffer is
     -- State counter for command execution, increments every cycle.
     signal counter_r:   unsigned(11 downto 0);
     
+    -- Temporary data for command execution
+    signal temp_r:      std_logic_vector(7 downto 0);
+    
     -- Packet shifting index
     signal shift_r:     unsigned(1 downto 0);
     
@@ -111,6 +114,7 @@ begin
             arg_r <= (others => '0');
             status_r <= '0';
             counter_r <= (others => '0');
+            temp_r <= (others => '0');
             shift_r <= (others => '0');
             
             fifo_read_r <= '0';
@@ -135,6 +139,8 @@ begin
                     cmd_r <= cmd;
                     arg_r <= unsigned(arg);
                     counter_r <= (others => '0');
+                
+                    temp_r <= (others => '-');
                 
                     ram_we <= '0';
                     ram_re <= '0';
@@ -169,11 +175,15 @@ begin
                         assert arglen_v = 0 report "Overwriting packet!";
                     end if;
                     
-                    fifo_read_r <= '1';
-                    
                     -- There is 2 cycle delay from fifo_read to output update.
-                    if fifo_valid = '1' and counter_r >= 2 then
+                    -- We pipeline so that new data is read every other cycle.
+                    -- We can't pipeline deeper, because we need to detect
+                    -- EOP before we read too far.
+                    fifo_read_r <= '1';
+                    ram_we <= '0';
+                    if fifo_valid = '1' and fifo_read_r = '1' then
                         -- Store byte to RAM
+                        fifo_read_r <= '0';
                         ram_we <= '1';
                         ram_waddr(8 downto 7) <= std_logic_vector(arg_r + shift_r);
                         ram_waddr(6 downto 0) <= std_logic_vector(arglen_v(6 downto 0));
@@ -186,11 +196,49 @@ begin
                             cmd_r <= IDLE;
                             status_r <= '1';
                         end if;
-                    else
-                        -- Wait for data
-                        ram_we <= '0';
+                    end if;
+                
+                when CMP =>
+                    ram_re <= '1';
+                    
+                    if arglen_v /= lengths_r(to_integer(shift_r)) then
+                        -- Packet lengths differ
+                        cmd_r <= IDLE;
+                        status_r <= '0';
                     end if;
                     
+                    -- Note that we ignore first 4 bytes (timestamp).
+                    
+                    if counter_r(0) = '0' then
+                        -- Read packet 0 byte M + 4
+                        ram_raddr(8 downto 7) <= std_logic_vector(shift_r);
+                        ram_raddr(6 downto 0) <= std_logic_vector(counter_r(7 downto 1) + 4);
+                    else
+                        -- Read packet N byte M + 4
+                        ram_raddr(8 downto 7) <= std_logic_vector(arg_r + shift_r);
+                        ram_raddr(6 downto 0) <= std_logic_vector(counter_r(7 downto 1) + 4);
+                    end if;
+                    
+                    if counter_r >= 2 then
+                        if counter_r(0) = '0' then
+                            -- Store the byte from packet 0 to temp register
+                            temp_r <= ram_rdata;
+                        else
+                            -- Compare bytes from packets 0 and N.
+                            if temp_r /= ram_rdata then
+                               -- Packet bytes don't match
+                               cmd_r <= IDLE;
+                               status_r <= '0';
+                            end if;
+                        end if;
+                    end if;
+                    
+                    if counter_r(7 downto 1) + 4 = arglen_v then
+                        -- End of packet
+                        cmd_r <= IDLE;
+                        status_r <= '1';
+                    end if;
+                
                 when others =>
                     cmd_r <= IDLE;
             end case;

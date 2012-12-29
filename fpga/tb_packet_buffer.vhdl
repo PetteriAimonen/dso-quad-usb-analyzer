@@ -38,12 +38,20 @@ begin
             clk <= '0'; wait for PERIOD/2; clk <= '1'; wait for PERIOD/2;
         end procedure;
         
-        procedure write_packet(data : std_logic_vector(0 to 63)) is
+        procedure write_packet(
+            data : std_logic_vector(0 to 63);
+            delay : integer := 0
+            ) is
         begin
             for i in 0 to 6 loop
                 data_in <= "0" & data(i * 8 to i * 8 + 7);
                 write_in <= '1';
                 clock;
+                write_in <= '0';
+                
+                for i in 1 to delay loop
+                    clock;
+                end loop;
             end loop;
             
             data_in <= "1" & data(56 to 63);
@@ -78,36 +86,67 @@ begin
                 clock;
             end loop;
         end procedure;
+        
+        procedure wait_complete is
+        begin
+            while busy = '1' loop
+                clock;
+            end loop;
+        end procedure;
+  
+        procedure start_cmd(cmd_n : BufferCommand; arg_n : std_logic_vector(1 downto 0)) is
+        begin
+            assert busy = '0' report "Tried to start new command while busy!";
+            
+            cmd <= cmd_n;
+            arg <= arg_n;
+            clock;
+            cmd <= IDLE;
+        end procedure;
+                  
     begin
         rst_n <= '0';
         fifo_read <= '0';
         data_in <= (others => '-');
         write_in <= '0';
+        cmd <= IDLE;
+        arg <= "00";
         clock;
         rst_n <= '1';
         
         -- Test READ-WRITE roundtrip
         write_packet(X"01000000AAAAAA00");
         
-        cmd <= READ;
-        arg <= "00";
-        clock;
-        cmd <= IDLE;
+        start_cmd(READ, "00");
+        wait_complete;
         
-        while busy = '1' loop
-            clock;
-        end loop;
-        
-        cmd <= WRITE;
-        arg <= "00";
-        clock;
-        cmd <= IDLE;
-        
-        while busy = '1' loop
-            clock;
-        end loop;
+        start_cmd(WRITE, "00");
+        wait_complete;
         
         verify_packet(X"01000000AAAAAA00");
+        
+        -- Test slow packet READ
+        start_cmd(READ, "10");
+        write_packet(X"1122334455667788", 5);
+        wait_complete;
+        
+        start_cmd(WRITE, "10");
+        wait_complete;
+        
+        verify_packet(X"1122334455667788");
+        
+        -- Test CMP when packets are equal except timestamp
+        write_packet(X"0000000055667788");
+        write_packet(X"1111111155667788");
+        start_cmd(READ, "00");
+        wait_complete;
+        start_cmd(READ, "01");
+        wait_complete;
+        
+        start_cmd(CMP, "01");
+        wait_complete;
+        
+        assert status = '1' report "Packets should compare equal";
         
         wait;
     end process;
