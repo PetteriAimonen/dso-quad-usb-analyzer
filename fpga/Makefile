@@ -34,6 +34,11 @@ tb_packet_buffer: fifo.vhdl ramblock.vhdl packet_buffer.vhdl tb_packet_buffer.vh
 	ghdl -a $(GHDL_ARGS) $^
 	ghdl -e $(GHDL_ARGS) $@
 
+tb_repeat_filter: fifo.vhdl ramblock.vhdl packet_buffer.vhdl repeat_filter.vhdl \
+                  std_logic_textio.vhdl tb_repeat_filter.vhdl
+	ghdl -a $(GHDL_ARGS) $^
+	ghdl -e $(GHDL_ARGS) $@
+
 run_tbs: $(TESTS)
 	./tb_usb_decoder
 	./tb_fifo
