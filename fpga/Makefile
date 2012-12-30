@@ -45,3 +45,5 @@ run_tbs: $(TESTS)
 	./tb_edge_matcher
 	./tb_packet_filter
 	./tb_packet_buffer
+	./tb_repeat_filter
+	diff -w tb_repeat_filter_expected.txt tb_repeat_filter_output.txt

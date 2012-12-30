@@ -3,7 +3,7 @@
 --
 -- The suppression of repeated packets is signalled by setting bit 2 in the
 -- packet's EOP byte. The packet with the indicator is sent when the repeating
--- sequence starts.
+-- sequence starts. When the sequence ends, the last packet is let through.
 --
 -- To stop the last packet in a capture from getting stuck in the buffer,
 -- the buffers are flushed after a given delay after receiving last packet.
@@ -32,6 +32,8 @@
 -- 
 -- ---------------
 -- Repeat length 1
+-- The latest packet of the sequence is kept in buffer 1.
+-- New packets go to buffer 0 and are compared to buffer 1.
 -- 
 -- Send marker for start of sequence    
 --     20. Flag 1
@@ -45,10 +47,12 @@
 --     26. If too long or timeout, goto 60
 --     27. Compare to 1
 --     28. If not equal, goto 7.
---     29. Drop 0, goto 25.
+--     29. Drop 1, goto 24.
 -- 
 -- ---------------
 -- Repeat length 2
+-- The two latest packets of sequence are kept in 1 and 2.
+-- New packets are compared to 2, which is then dropped and shifted.
 -- 
 -- Wait for next packet to verify that both packets of sequence repeat.
 --     40. Shift
@@ -70,7 +74,7 @@
 --     52. If too long or timeout, goto 60
 --     53. Compare to 2
 --     54. If not equal, goto 7.
---     55. Drop 0, goto 51.
+--     55. Drop 2, goto 50.
 -- 
 -- ---------------------------------
 -- Flushing when there is read error
@@ -130,7 +134,7 @@ begin
         elsif rising_edge(clk) then
             cmd <= IDLE;
         
-            if busy = '0' then
+            if busy = '0' and cmd = IDLE then
                 line_r <= line_r + 1;
                 case line_r is
                     -- Main processing loop
@@ -153,7 +157,7 @@ begin
                     when 26 => if status = '0' then line_r <= 60; end if;
                     when 27 => cmd <= CMP; arg <= "01";
                     when 28 => if status = '0' then line_r <= 7; end if;
-                    when 29 => cmd <= DROP; arg <= "00"; line_r <= 25;
+                    when 29 => cmd <= DROP; arg <= "01"; line_r <= 24;
                     
                     -- Repeat length 2
                     when 40 => cmd <= SHIFT; arg <= "01";
@@ -171,7 +175,7 @@ begin
                     when 52 => if status = '0' then line_r <= 60; end if;
                     when 53 => cmd <= CMP; arg <= "10";
                     when 54 => if status = '0' then line_r <= 7; end if;
-                    when 55 => cmd <= DROP; arg <= "00"; line_r <= 51;
+                    when 55 => cmd <= DROP; arg <= "10"; line_r <= 50;
                     
                     -- Flush after read error
                     when 60 => cmd <= WRITE; arg <= "11";

@@ -224,6 +224,12 @@ begin
                     ram_raddr(8 downto 7) <= std_logic_vector(arg_r + shift_r);
                     ram_raddr(6 downto 0) <= std_logic_vector(counter_r(6 downto 0));
                     
+                    if arglen_v = 0 then
+                        -- No packet to flush
+                        cmd_r <= IDLE;
+                        status_r <= '0';
+                    end if;
+                    
                     -- 2 cycle delay from RAM read to data available
                     if counter_r >= 2 then
                         write_out_r <= '1';
