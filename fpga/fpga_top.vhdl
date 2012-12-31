@@ -56,6 +56,7 @@ architecture rtl of fpga_top is
     signal fifo_data_out:       std_logic_vector(8 downto 0);
     signal fifo_count:          std_logic_vector(15 downto 0);
     signal fifo_read:           std_logic;
+    signal fifo_valid:          std_logic;
     
     -- Output data bus
     signal output_data:         std_logic_vector(15 downto 0);
@@ -108,11 +109,16 @@ begin
         others => '0'
     );
     
+    -- Repeated packet filter
+    rfilt1: entity work.RepeatFilter
+        port map (clk, rst_n, cfg_rfilter, filt_data, filt_write,
+            rfilt_data, rfilt_write);
+
     -- FIFO storage of data
     fifo1: entity work.FIFO
         generic map (width_g => 9, depth_g => fifo_depth_g)
-        port map (clk, rst_n, fifo_data_out, fifo_read,
-            filt_data, filt_write, fifo_count);
+        port map (clk, rst_n, fifo_data_out, fifo_read, fifo_valid,
+            rfilt_data, rfilt_write, fifo_count);
     
     -- Remove values from FIFO on rising edge of fsmc_nrd
     process (clk, rst_n)

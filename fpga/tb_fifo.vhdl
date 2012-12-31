@@ -13,13 +13,14 @@ architecture testbench of tb_fifo is
     signal clk, rst_n:  std_logic;
     signal data_out:    std_logic_vector(fifo_width_g - 1 downto 0);
     signal read:        std_logic;
+    signal valid:       std_logic;
     signal data_in:     std_logic_vector(fifo_width_g - 1 downto 0);
     signal write:       std_logic;
     signal count:       std_logic_vector(15 downto 0);
 begin
     fifo1:  entity work.FIFO
         generic map (width_g => fifo_width_g, depth_g => fifo_depth_g)
-        port map (clk, rst_n, data_out, read, data_in, write, count);
+        port map (clk, rst_n, data_out, read, valid, data_in, write, count);
     
     process
         procedure clock is
@@ -73,6 +74,8 @@ begin
                 report "FIFO output is wrong: " & natural'Image(output)
                 & " should be " & natural'Image(i);
             
+            assert valid = '1' report "FIFO valid should be 1";
+            
             read <= '1';
             clock;
             read <= '0';
@@ -85,7 +88,7 @@ begin
         
         clock;
         
-        assert unsigned(count) = 0 report "FIFO should be empty";
+        assert unsigned(count) = 0 and valid = '0' report "FIFO should be empty";
         
         -- Do a few dummy reads to test reading when empty.
         read <= '1';

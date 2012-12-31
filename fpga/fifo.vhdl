@@ -25,6 +25,7 @@ entity FIFO is
         -- later.
         data_out:   out std_logic_vector(width_g - 1 downto 0);
         read:       in std_logic;
+        valid:      out std_logic;
 
         -- Data input port. When 'write' is high on clock edge,
         -- the value on data_in port is stored in the queue. If
@@ -69,10 +70,12 @@ architecture rtl of FIFO is
     -- Registers for output signals
     signal data_out_r:  std_logic_vector(width_g - 1 downto 0);
     signal count_r:     unsigned(counter_width_c - 1 downto 0);
+    signal valid_r:     std_logic;
     
     signal next_write_pos_r: unsigned(counter_width_c - 1 downto 0);
 begin
     data_out <= data_out_r;
+    valid <= valid_r;
     count(counter_width_c - 1 downto 0) <= std_logic_vector(count_r);
     count(15 downto counter_width_c) <= (others => '0');
     
@@ -81,12 +84,19 @@ begin
         if rst_n = '0' then
             read_pos_r <= (others => '0');
             write_pos_r <= (others => '0');
-            count_r <= (others => '0');
             data_out_r <= (others => '0');
+            count_r <= (others => '0');
+            valid_r <= '0';
             next_write_pos_r <= to_unsigned(1, counter_width_c);
         elsif rising_edge(clk) then
             count_r <= write_pos_r - read_pos_r;
             data_out_r <= buffer_r(to_integer(read_pos_r));
+            
+            if write_pos_r /= read_pos_r then
+                valid_r <= '1';
+            else
+                valid_r <= '0';
+            end if;
             
             -- Increment read position unless fifo is already empty
             if read = '1' and count_r /= 0 then

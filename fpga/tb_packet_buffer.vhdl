@@ -21,11 +21,12 @@ architecture testbench of tb_packet_buffer is
     signal fifo_out:    std_logic_vector(8 downto 0);
     signal fifo_count:  std_logic_vector(15 downto 0);
     signal fifo_read:   std_logic;
+    signal fifo_valid:  std_logic;
 begin
     -- We collect output from the block to a fifo for inspection
     output_fifo: entity work.FIFO
         generic map (width_g => 9, depth_g => 256)
-        port map (clk, rst_n, fifo_out, fifo_read, data_out, write_out, fifo_count);
+        port map (clk, rst_n, fifo_out, fifo_read, fifo_valid, data_out, write_out, fifo_count);
     
     -- The packet buffer being tested
     buf0: entity work.PacketBuffer
@@ -212,7 +213,7 @@ begin
         start_cmd(FLUSH, "00");
         
         for i in 0 to 255 loop
-            while unsigned(fifo_count) = 0 loop
+            while fifo_valid = '0' loop
                 clock;
             end loop;
             
@@ -226,7 +227,7 @@ begin
             clock;
         end loop;
         
-        while unsigned(fifo_count) = 0 loop
+        while fifo_valid = '0' loop
             clock;
         end loop;
         assert fifo_out = "1" & X"00" report "Wrong EOP";

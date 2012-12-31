@@ -102,9 +102,8 @@ begin
     -- needs.
     input_fifo: entity work.FIFO
         generic map (width_g => 9, depth_g => 256)
-        port map (clk, rst_n, fifo_out, fifo_read_r,
+        port map (clk, rst_n, fifo_out, fifo_read_r, fifo_valid,
             data_in, write_in, fifo_count);
-    fifo_valid <= '1' when (fifo_count /= X"0000") else '0';
     
     process (clk)
         variable argidx_v : integer range 0 to 3;
