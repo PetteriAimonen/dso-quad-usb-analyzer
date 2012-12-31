@@ -22,6 +22,7 @@ entity Config is
         fsmc_db:        in std_logic_vector(15 downto 0);
 
         cfg_read_count: out std_logic;
+        cfg_rfilter:    out std_logic;
         cfg_ign_SOF:    out std_logic;
         cfg_ign_IN:     out std_logic;
         cfg_ign_OUT:    out std_logic;
@@ -35,6 +36,7 @@ architecture rtl of Config is
     signal config_r: std_logic_vector(15 downto 0);
 begin
     cfg_read_count <= config_r(0);
+    cfg_rfilter <= config_r(1);
     cfg_ign_SOF <= config_r(8);
     cfg_ign_IN  <= config_r(9);
     cfg_ign_OUT <= config_r(10);

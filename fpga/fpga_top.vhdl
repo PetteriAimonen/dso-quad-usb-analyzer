@@ -36,6 +36,7 @@ architecture rtl of fpga_top is
     
     -- Configuration register signals
     signal cfg_read_count:      std_logic;
+    signal cfg_rfilter:         std_logic;
     signal cfg_ign_SOF:         std_logic;
     signal cfg_ign_IN:          std_logic;
     signal cfg_ign_OUT:         std_logic;
@@ -51,6 +52,10 @@ architecture rtl of fpga_top is
     signal filt_filter:         std_logic_vector(15 downto 0);
     signal filt_data:           std_logic_vector(8 downto 0);
     signal filt_write:          std_logic;
+
+    -- Repeat filter signals
+    signal rfilt_data:          std_logic_vector(8 downto 0);
+    signal rfilt_write:         std_logic;
     
     -- FIFO outputs
     signal fifo_data_out:       std_logic_vector(8 downto 0);
@@ -73,8 +78,8 @@ begin
     -- Configuration register
     config1: entity work.Config
         port map (clk, rst_n, fsmc_ce, fsmc_nwr, fsmc_db, 
-            cfg_read_count, cfg_ign_SOF, cfg_ign_IN, cfg_ign_OUT,
-            cfg_ign_PRE, cfg_ign_ACK, cfg_ign_NAK);
+            cfg_read_count, cfg_rfilter, cfg_ign_SOF, cfg_ign_IN,
+            cfg_ign_OUT, cfg_ign_PRE, cfg_ign_ACK, cfg_ign_NAK);
     
     -- Binarization of ADC data.
     -- In 200mV range, din >= 128 gives 1 V threshold voltage
