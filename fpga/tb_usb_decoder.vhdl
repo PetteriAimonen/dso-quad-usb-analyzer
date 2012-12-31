@@ -86,8 +86,8 @@ begin
         assert buffer_r(0) = "0" & X"A5" report "Byte 1 wrong";
         assert buffer_r(1) = "0" & X"11" report "Byte 2 wrong";
         assert buffer_r(2) = "0" & X"5A" report "Byte 3 wrong";
-        assert buffer_r(3) = "0" & X"01" report "Time 1 wrong";
-        assert buffer_r(4) = "0" & X"00" report "Time 2 wrong";
+        assert buffer_r(3) = "0" & X"E9" report "Time 1 wrong";
+        assert buffer_r(4) = "0" & X"03" report "Time 2 wrong";
         assert buffer_r(5) = "0" & X"00" report "Time 3 wrong";
         assert buffer_r(6) = "0" & X"00" report "Time 4 wrong";
         assert buffer_r(7) = "1" & X"00" report "EOP wrong";

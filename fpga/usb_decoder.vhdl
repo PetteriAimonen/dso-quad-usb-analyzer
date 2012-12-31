@@ -6,8 +6,8 @@
 --
 -- [4 bytes timestamp] [Packet data] [1-byte EOP]
 --
--- The bottom part of the
--- end-of-packet token encodes the following information:
+-- The bottom part of the end-of-packet token encodes the following
+-- information:
 --
 -- bit 0: If 1, a PHY-level error occurred
 -- bit 1: If 1, a USB reset has occurred
@@ -55,7 +55,7 @@ architecture rtl of USBDecoder is
     signal write_r:     std_logic;
 
     -- Millisecond counter for the timestamp
-    signal prescaler_r:  integer range 0 to 72000;
+    signal prescaler_r:  integer range 0 to 71;
     signal timestamp_r:  unsigned(31 downto 0);
     signal packettime_r: std_logic_vector(31 downto 0);
     
@@ -96,7 +96,7 @@ begin
             prescaler_r <= 0;
             state_r <= IDLE;
         elsif rising_edge(clk) then
-            if prescaler_r = 71999 then
+            if prescaler_r = 71 then
                 prescaler_r <= 0;
                 timestamp_r <= timestamp_r + 1;
             else
