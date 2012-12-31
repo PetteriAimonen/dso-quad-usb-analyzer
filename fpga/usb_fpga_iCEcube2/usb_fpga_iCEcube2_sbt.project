@@ -2,7 +2,7 @@
 Version=SiliconBlue Tech iCEcube - Release: 2011.12.19577 - Build Date: Feb 9 2012 12:48:12
 ProjectName=usb_fpga_iCEcube2
 Vendor=SiliconBlue
-ProjectVFiles=../usb_rx_phy.vhdl,../usb_decoder.vhdl,../edge_matcher.vhdl,../config.vhdl,../fpga_top.vhdl,../fifo.vhdl,../packet_filter.vhdl
+ProjectVFiles=../usb_rx_phy.vhdl,../usb_decoder.vhdl,../edge_matcher.vhdl,../config.vhdl,../fpga_top.vhdl,../fifo.vhdl,../packet_filter.vhdl,../ramblock.vhdl,../repeat_filter.vhdl,../packet_buffer.vhdl
 ProjectCFiles=../timing_contraints.sdc
 CurImplementation=usb_fpga_iCEcube2_Implmnt
 Implementations=usb_fpga_iCEcube2_Implmnt
@@ -10,7 +10,7 @@ StartFromSynthesis=yes
 IPGeneration=false
 
 [tool options]
-PlacerEffortLevel=std
+PlacerEffortLevel=mid
 PlacerAutoLutCascade=yes
 PlacerAutoRamCascade=yes
 RouteWithTimingDriven=yes
@@ -24,7 +24,7 @@ BitmapSetSecurity=no
 BitmapSetNoUsedIONoPullup=no
 FloorPlannerShowFanInNets=yes
 FloorPlannerShowFanOutNets=yes
-HookTo3rdPartyTextEditor=
+HookTo3rdPartyTextEditor=no
 
 [usb_fpga_iCEcube2_Implmnt]
 DeviceFamily=iCE65

@@ -23,12 +23,13 @@
 -- 
 --     0. Write out packet 0 (if any).
 --     1. Read in packet 0.
---     2. If too long or timeout, goto 60
---     3. Compare to 1
---     4. If equal, goto 20
---     5. Compare to 2
---     6. If equal, goto 40
---     7. Shift and goto 0
+--     2. If enable = 0, goto 0.
+--     3. If too long or timeout, goto 60
+--     4. Compare to 1
+--     5. If equal, goto 20
+--     6. Compare to 2
+--     7. If equal, goto 40
+--     8. Shift and goto 0
 -- 
 -- ---------------
 -- Repeat length 1
@@ -46,7 +47,7 @@
 --     25. Read in packet 0.
 --     26. If too long or timeout, goto 60
 --     27. Compare to 1
---     28. If not equal, goto 7.
+--     28. If not equal, goto 8.
 --     29. Drop 1, goto 24.
 -- 
 -- ---------------
@@ -73,7 +74,7 @@
 --     51. Read in packet 0.
 --     52. If too long or timeout, goto 60
 --     53. Compare to 2
---     54. If not equal, goto 7.
+--     54. If not equal, goto 8.
 --     55. Drop 2, goto 50.
 -- 
 -- ---------------------------------
@@ -113,7 +114,7 @@ end entity;
 
 architecture rtl of RepeatFilter is
     -- Current line in program
-    signal line_r:              integer range 0 to 100;
+    signal line_r:              integer range 0 to 255;
 
     -- Signals for packet buffer
     signal cmd:                 BufferCommand;
@@ -133,19 +134,20 @@ begin
             arg <= "00";
         elsif rising_edge(clk) then
             cmd <= IDLE;
-        
+            
             if busy = '0' and cmd = IDLE then
                 line_r <= line_r + 1;
                 case line_r is
                     -- Main processing loop
                     when 0 => cmd <= WRITE; arg <= "00";
                     when 1 => cmd <= READ; arg <= "00";
-                    when 2 => if status = '0' then line_r <= 60; end if;
-                    when 3 => cmd <= CMP; arg <= "01";
-                    when 4 => if status = '1' then line_r <= 20; end if;
-                    when 5 => cmd <= CMP; arg <= "10";
-                    when 6 => if status = '1' then line_r <= 40; end if;
-                    when 7 => cmd <= SHIFT; arg <= "01"; line_r <= 0;
+                    when 2 => if enable = '0' then line_r <= 0; end if;
+                    when 3 => if status = '0' then line_r <= 60; end if;
+                    when 4 => cmd <= CMP; arg <= "01";
+                    when 5 => if status = '1' then line_r <= 20; end if;
+                    when 6 => cmd <= CMP; arg <= "10";
+                    when 7 => if status = '1' then line_r <= 40; end if;
+                    when 8 => cmd <= SHIFT; arg <= "01"; line_r <= 0;
                     
                     -- Repeat length 1
                     when 20 => cmd <= FLAGR; arg <= "01";
@@ -156,7 +158,7 @@ begin
                     when 25 => cmd <= READ; arg <= "00";
                     when 26 => if status = '0' then line_r <= 60; end if;
                     when 27 => cmd <= CMP; arg <= "01";
-                    when 28 => if status = '0' then line_r <= 7; end if;
+                    when 28 => if status = '0' then line_r <= 8; end if;
                     when 29 => cmd <= DROP; arg <= "01"; line_r <= 24;
                     
                     -- Repeat length 2
@@ -174,7 +176,7 @@ begin
                     when 51 => cmd <= READ; arg <= "00";
                     when 52 => if status = '0' then line_r <= 60; end if;
                     when 53 => cmd <= CMP; arg <= "10";
-                    when 54 => if status = '0' then line_r <= 7; end if;
+                    when 54 => if status = '0' then line_r <= 8; end if;
                     when 55 => cmd <= DROP; arg <= "10"; line_r <= 50;
                     
                     -- Flush after read error

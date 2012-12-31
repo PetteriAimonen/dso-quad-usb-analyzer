@@ -1,6 +1,9 @@
 #-- Synopsys, Inc.
-#-- Project file Z:\dso-quad-usb-analyzer\fpga\usb_fpga_iCEcube2\usb_fpga_iCEcube2\usb_fpga_iCEcube2_syn.prj
+#-- Version E-2011.03S-SP1-1
+#-- Project file Z:\dso-quad-usb-analyzer\fpga\usb_fpga_iCEcube2\usb_fpga_iCEcube2_syn.prj
+
 #project files
+
 
 add_file -vhdl -lib work "../usb_rx_phy.vhdl"
 add_file -vhdl -lib work "../usb_decoder.vhdl"
@@ -9,11 +12,16 @@ add_file -vhdl -lib work "../config.vhdl"
 add_file -vhdl -lib work "../fpga_top.vhdl"
 add_file -vhdl -lib work "../fifo.vhdl"
 add_file -vhdl -lib work "../packet_filter.vhdl"
+add_file -vhdl -lib work "../ramblock.vhdl"
+add_file -vhdl -lib work "../repeat_filter.vhdl"
+add_file -vhdl -lib work "../packet_buffer.vhdl"
 add_file -constraint -lib work "../timing_contraints.sdc"
 #implementation: "usb_fpga_iCEcube2_Implmnt"
 impl -add usb_fpga_iCEcube2_Implmnt -type fpga
 
+#
 #implementation attributes
+
 set_option -vlog_std v2001
 set_option -project_relative_includes 1
 
@@ -27,7 +35,7 @@ set_option -part_companion ""
 #compilation/mapping options
 
 # mapper_options
-set_option -frequency auto
+set_option -frequency 72
 set_option -write_verilog 0
 set_option -write_vhdl 0
 
@@ -35,10 +43,11 @@ set_option -write_vhdl 0
 set_option -maxfan 10000
 set_option -disable_io_insertion 0
 set_option -pipe 1
-set_option -retiming 0
-set_option -update_models_cp 0
+set_option -retiming 1
+set_option -update_models_cp 1
 set_option -fixgatedclocks 2
 set_option -fixgeneratedclocks 0
+set_option -run_prop_extract 1
 
 # NFilter
 set_option -popfeed 0
@@ -56,6 +65,5 @@ set_option -resource_sharing 1
 set_option -write_apr_constraint 1
 
 #set result format/file last
-project -result_format "edif"
-project -result_file ./usb_fpga_iCEcube2_Implmnt/usb_fpga_iCEcube2.edf
+project -result_file "./usb_fpga_iCEcube2_Implmnt/usb_fpga_iCEcube2.edf"
 impl -active "usb_fpga_iCEcube2_Implmnt"

@@ -5,6 +5,7 @@
 package PacketBuffer_pkg is
     type BufferCommand is (
         IDLE,
+        DONE,  -- Wait state for finishing command execution
         WRITE, -- Write out packet at position N and clear it.
         READ,  -- Read a new packet to position N
         FLUSH, -- Write out packet N and also input until EOP.
@@ -50,6 +51,9 @@ architecture rtl of PacketBuffer is
     type length_array_t is array(0 to 3) of length_t;
     signal lengths_r:   length_array_t;
 
+    -- Length of the packet given as argument to current command
+    signal arglen_r:    length_t;
+    
     -- Command interface
     signal cmd_r:       BufferCommand;
     signal arg_r:       unsigned(1 downto 0);
@@ -60,12 +64,18 @@ architecture rtl of PacketBuffer is
     
     -- Temporary data for command execution
     signal temp_r:      std_logic_vector(7 downto 0);
+    signal flag_r:      std_logic;
+    signal flag2_r:     std_logic;
+    signal flag_delay_r:std_logic;
     
     -- Packet shifting index
     signal shift_r:     unsigned(1 downto 0);
     
     -- Packet read timeout counter
-    signal timeout_r:   integer range 0 to timeout_g;
+    signal prescaler_r: unsigned(11 downto 0);
+    constant timeout_c: integer := (timeout_g + 1023) / 1024;
+    signal timeout_r:   integer range 0 to timeout_c;
+    signal timeouted_r: std_logic;
     
     -- Packet output interface
     signal data_out_r:  std_logic_vector(8 downto 0);
@@ -105,23 +115,27 @@ begin
         port map (clk, rst_n, fifo_out, fifo_read_r, fifo_valid,
             data_in, write_in, fifo_count);
     
-    process (clk)
-        variable argidx_v : integer range 0 to 3;
-        variable arglen_v : unsigned(6 downto 0);
+    process (clk, rst_n)
     begin
         if rst_n = '0' then
             lengths_r <= (others => (others => '0'));
+            arglen_r <= (others => '0');
             
             cmd_r <= IDLE;
             arg_r <= (others => '0');
             status_r <= '0';
             counter_r <= (others => '0');
             temp_r <= (others => '0');
+            flag_r <= '0';
+            flag_delay_r <= '0';
+            flag2_r <= '0';
             shift_r <= (others => '0');
             
             fifo_read_r <= '0';
             
-            timeout_r <= timeout_g;
+            timeout_r <= timeout_c;
+            prescaler_r <= (others => '0');
+            timeouted_r <= '0';
             
             ram_wdata <= (others => '0');
             ram_waddr <= (others => '0');
@@ -133,12 +147,17 @@ begin
             write_out_r <= '0';
             
         elsif rising_edge(clk) then
-            argidx_v := to_integer(arg_r + shift_r);
-            arglen_v := lengths_r(argidx_v);
             counter_r <= counter_r + 1;
+            flag_delay_r <= flag_r;
+            prescaler_r <= prescaler_r + 1;
             
             if timeout_r /= 0 then
-                timeout_r <= timeout_r - 1;
+                if prescaler_r(11) = '1' then
+                    prescaler_r(11) <= '0';
+                    timeout_r <= timeout_r - 1;
+                end if;
+            else
+                timeouted_r <= '1';
             end if;
             
             case cmd_r is
@@ -146,18 +165,31 @@ begin
                     data_out_r <= (others => '-');
                     write_out_r <= '0';
                     fifo_read_r <= '0';
-                    cmd_r <= cmd;
-                    arg_r <= unsigned(arg);
-                    counter_r <= (others => '0');
-                
-                    temp_r <= (others => '-');
-                    timeout_r <= timeout_g;
-                            
                     ram_we <= '0';
                     ram_re <= '0';
                     ram_waddr <= (others => '-');
                     ram_wdata <= (others => '-');
                     ram_raddr <= (others => '-');
+                    counter_r <= (others => '0');
+                    temp_r <= (others => '0');
+                    flag_r <= '0';
+                    flag_delay_r <= '0';
+                    flag2_r <= '0';
+                    timeout_r <= timeout_c;
+                    timeouted_r <= '0';
+                
+                    cmd_r <= cmd;
+                    arg_r <= unsigned(arg);
+                    arglen_r <= lengths_r(to_integer(unsigned(arg)));
+                            
+                    
+                when DONE =>
+                    fifo_read_r <= '0';
+                    write_out_r <= '0';
+                    
+                    -- Store modified packet length
+                    lengths_r(to_integer(unsigned(arg_r))) <= arglen_r;
+                    cmd_r <= IDLE;
                 
                 when WRITE =>
                     ram_re <= '1';
@@ -170,10 +202,15 @@ begin
                         data_out_r <= "0" & ram_rdata;
                     end if;
                     
-                    if counter_r = arglen_v + 1 then
+                    -- Detect end of packet early (to pipeline the cmp delay)
+                    if counter_r(6 downto 0) = arglen_r then
+                        flag_r <= '1';
+                    end if;
+                    
+                    if flag_r = '1' then
                         data_out_r(8) <= '1'; -- EOP marker
-                        arglen_v := (others => '0');
-                        cmd_r <= IDLE;
+                        arglen_r <= (others => '0');
+                        cmd_r <= DONE;
                         if counter_r = 0 then
                             status_r <= '0'; -- Buffer was empty
                         else
@@ -182,10 +219,8 @@ begin
                     end if;
                 
                 when READ =>
-                    if counter_r = 0 then
-                        assert arglen_v = 0 report "Overwriting packet!";
-                        arglen_v := (others => '0');
-                    end if;
+                    assert counter_r /= 0 or arglen_r = 0
+                        report "Overwriting packet!";
                     
                     -- There is 2 cycle delay from fifo_read to output update.
                     -- We pipeline so that new data is read every other cycle.
@@ -198,23 +233,25 @@ begin
                         fifo_read_r <= '0';
                         ram_we <= '1';
                         ram_waddr(8 downto 7) <= std_logic_vector(arg_r + shift_r);
-                        ram_waddr(6 downto 0) <= std_logic_vector(arglen_v);
+                        ram_waddr(6 downto 0) <= std_logic_vector(arglen_r);
                         ram_wdata <= fifo_out(7 downto 0);
                         
-                        arglen_v := arglen_v + 1;
+                        flag2_r <= fifo_out(8);
+                        arglen_r <= arglen_r + 1;
                         
-                        if fifo_out(8) = '1' then
-                            -- End of packet
-                            cmd_r <= IDLE;
-                            status_r <= '1';
-                        elsif arglen_v = 127 then
+                        if arglen_r = 126 then
                             -- Too long packet
-                            cmd_r <= IDLE;
+                            cmd_r <= DONE;
                             status_r <= '0';
                         end if;
-                    elsif timeout_r = 0 then
+                    elsif flag2_r = '1' then
+                        -- End of packet
+                        fifo_read_r <= '0';
+                        cmd_r <= DONE;
+                        status_r <= '1';
+                    elsif timeouted_r = '1' then
                         -- Timeout on read
-                        cmd_r <= IDLE;
+                        cmd_r <= DONE;
                         status_r <= '0';
                     end if;
                 
@@ -223,9 +260,9 @@ begin
                     ram_raddr(8 downto 7) <= std_logic_vector(arg_r + shift_r);
                     ram_raddr(6 downto 0) <= std_logic_vector(counter_r(6 downto 0));
                     
-                    if arglen_v = 0 then
+                    if arglen_r = 0 then
                         -- No packet to flush
-                        cmd_r <= IDLE;
+                        cmd_r <= DONE;
                         status_r <= '0';
                     end if;
                     
@@ -235,40 +272,45 @@ begin
                         data_out_r <= "0" & ram_rdata;
                     end if;
                     
-                    if counter_r - 2 = arglen_v then
-                        -- The pass through input until EOP.
-                        counter_r <= counter_r;
+                    if counter_r(6 downto 0) = arglen_r then
+                        flag_r <= '1';
+                    end if;
+                    
+                    if flag_delay_r = '1' then
+                        -- Then pass through input until EOP.
                         fifo_read_r <= '1';
                         write_out_r <= '0';
+                        data_out_r <= (others => '-');
                         
                         if fifo_valid = '1' and fifo_read_r = '1' then
+                            flag2_r <= fifo_out(8);
                             fifo_read_r <= '0';
                             data_out_r <= fifo_out;
                             write_out_r <= '1';
-                            
-                            if fifo_out(8) = '1' then
-                                arglen_v := (others => '0');
-                                cmd_r <= IDLE;
-                                status_r <= '1';
-                            end if;
+                        elsif flag2_r = '1' then
+                            -- End of packet
+                            arglen_r <= (others => '0');
+                            fifo_read_r <= '0';
+                            cmd_r <= DONE;
+                            status_r <= '1';
                         end if;
                     end if;
                 
                 when DROP =>
-                    if arglen_v = 0 then
+                    if arglen_r = 0 then
                         status_r <= '0'; -- No packet
                     else
                         status_r <= '1';
                     end if;
-                    arglen_v := (others => '0');
-                    cmd_r <= IDLE;
+                    arglen_r <= (others => '0');
+                    cmd_r <= DONE;
                 
                 when CMP =>
                     ram_re <= '1';
                     
-                    if arglen_v /= lengths_r(to_integer(shift_r)) then
+                    if arglen_r /= lengths_r(0) then
                         -- Packet lengths differ
-                        cmd_r <= IDLE;
+                        cmd_r <= DONE;
                         status_r <= '0';
                     end if;
                     
@@ -277,55 +319,62 @@ begin
                     if counter_r(0) = '0' then
                         -- Read packet 0 byte M + 4
                         ram_raddr(8 downto 7) <= std_logic_vector(shift_r);
-                        ram_raddr(6 downto 0) <= std_logic_vector(counter_r(7 downto 1) + 4);
                     else
                         -- Read packet N byte M + 4
                         ram_raddr(8 downto 7) <= std_logic_vector(arg_r + shift_r);
-                        ram_raddr(6 downto 0) <= std_logic_vector(counter_r(7 downto 1) + 4);
                     end if;
+                    ram_raddr(6 downto 0) <= std_logic_vector(counter_r(7 downto 1) + 4);
                     
                     if counter_r >= 2 then
+                        temp_r <= ram_rdata xor temp_r;
+                        
                         if counter_r(0) = '0' then
-                            -- Store the byte from packet 0 to temp register
-                            temp_r <= ram_rdata;
-                        else
-                            -- Compare bytes from packets 0 and N.
-                            if temp_r /= ram_rdata then
+                            -- Check results of previous compare
+                            if temp_r /= X"00" then
                                -- Packet bytes don't match
-                               cmd_r <= IDLE;
+                               cmd_r <= DONE;
                                status_r <= '0';
                             end if;
                         end if;
                     end if;
                     
-                    if counter_r(7 downto 1) + 2 = arglen_v then
+                    if ram_raddr(6 downto 0) = std_logic_vector(arglen_r) then
                         -- End of packet
-                        cmd_r <= IDLE;
+                        flag_r <= '1';
+                    end if;
+                    
+                    if flag_delay_r = '1' then
+                        -- EOP is delayed so that comparison has finished
+                        cmd_r <= DONE;
                         status_r <= '1';
                     end if;
                 
                 when SHIFT =>
+                    assert arg_r = "01" report "Only shifts by 1 supported";
+                    lengths_r(0) <= lengths_r(3);
+                    lengths_r(1) <= lengths_r(0);
+                    lengths_r(2) <= lengths_r(1);
+                    lengths_r(3) <= lengths_r(2);
                     shift_r <= shift_r - arg_r;
-                    cmd_r <= IDLE;
+                    cmd_r <= IDLE; -- Skip writeback
                 
                 when FLAGR =>
                     ram_re <= '1';
                     ram_raddr(8 downto 7) <= std_logic_vector(arg_r + shift_r);
-                    ram_raddr(6 downto 0) <= std_logic_vector(arglen_v - 1);
+                    ram_raddr(6 downto 0) <= std_logic_vector(arglen_r - 1);
                     
-                    if counter_r = 2 then
+                    -- 2 cycle delay for ram access
+                    if counter_r(1) = '1' then
                         ram_we <= '1';
                         ram_waddr <= ram_raddr;
                         ram_wdata <= ram_rdata;
                         ram_wdata(2) <= '1'; -- Set repeat flag
-                        cmd_r <= IDLE;
+                        cmd_r <= DONE;
                     end if;
                 
                 when others =>
                     cmd_r <= IDLE;
             end case;
-            
-            lengths_r(argidx_v) <= arglen_v;
         end if;
     end process;
 end architecture;
