@@ -30,7 +30,7 @@ begin
     
     -- The packet buffer being tested
     buf0: entity work.PacketBuffer
-        generic map (timeout_g => 1024)
+        generic map (timeout_g => 4096)
         port map (clk, rst_n, data_in, write_in, data_out, write_out, cmd, arg, busy, status);
     
     process
@@ -117,7 +117,7 @@ begin
         rst_n <= '1';
         
         -- Test READ-WRITE roundtrip
-        write_packet(X"01000000AAAAAA00");
+        write_packet(X"AAAAAA0100000000");
         
         start_cmd(READ, "00");
         wait_complete;
@@ -127,7 +127,7 @@ begin
         wait_complete;
         assert status = '1' report "WRITE failed";
         
-        verify_packet(X"01000000AAAAAA00");
+        verify_packet(X"AAAAAA0100000000");
         
         -- Test slow packet READ
         start_cmd(READ, "10");
@@ -142,8 +142,8 @@ begin
         verify_packet(X"1122334455667788");
         
         -- Test CMP when packets are equal except timestamp
-        write_packet(X"0000000055667788");
-        write_packet(X"1111111155667788");
+        write_packet(X"5566770000000088");
+        write_packet(X"5566771111111188");
         start_cmd(READ, "00");
         wait_complete;
         start_cmd(READ, "01");
@@ -158,11 +158,11 @@ begin
         start_cmd(DROP, "01"); wait_complete;
         
         -- Test CMP when packets differ (in EOP)
-        write_packet(X"0000000055667788");
+        write_packet(X"5566770000000088");
         start_cmd(READ, "00");
         wait_complete;
         assert status = '1' report "READ failed";
-        write_packet(X"1111111155667789");
+        write_packet(X"5566771111111189");
         start_cmd(READ, "11");
         wait_complete;
         assert status = '1' report "READ failed";
@@ -170,7 +170,43 @@ begin
         start_cmd(CMP, "11");
         wait_complete;
         
-        assert status = '0' report "Packets should compare different";
+        assert status = '0' report "Packets should compare different (1)";
+        
+        start_cmd(DROP, "00"); wait_complete;
+        start_cmd(DROP, "11"); wait_complete;
+        
+        -- Test CMP when packets differ (right before timestamp)
+        write_packet(X"5566770000000088");
+        start_cmd(READ, "00");
+        wait_complete;
+        assert status = '1' report "READ failed";
+        write_packet(X"5566781111111188");
+        start_cmd(READ, "11");
+        wait_complete;
+        assert status = '1' report "READ failed";
+        
+        start_cmd(CMP, "11");
+        wait_complete;
+        
+        assert status = '0' report "Packets should compare different (2)";
+        
+        start_cmd(DROP, "00"); wait_complete;
+        start_cmd(DROP, "11"); wait_complete;
+        
+        -- Test CMP when packets differ (at beginning)
+        write_packet(X"5466770000000088");
+        start_cmd(READ, "00");
+        wait_complete;
+        assert status = '1' report "READ failed";
+        write_packet(X"5566771111111188");
+        start_cmd(READ, "11");
+        wait_complete;
+        assert status = '1' report "READ failed";
+        
+        start_cmd(CMP, "11");
+        wait_complete;
+        
+        assert status = '0' report "Packets should compare different (3)";
         
         start_cmd(DROP, "00"); wait_complete;
         start_cmd(DROP, "11"); wait_complete;
@@ -179,7 +215,7 @@ begin
         start_cmd(SHIFT, "01");
         wait_complete;
         
-        write_packet(X"5555555511223300");
+        write_packet(X"1122335555555500");
         start_cmd(READ, "00");
         wait_complete;
         assert status = '1' report "READ failed";
@@ -194,7 +230,7 @@ begin
         wait_complete;
         assert status = '1' report "WRITE failed";
         
-        verify_packet(X"5555555511223304");
+        verify_packet(X"1122335555555504");
         
         -- Test overlong packets and FLUSH
         start_cmd(READ, "00");

@@ -19,16 +19,17 @@ architecture testbench of tb_repeat_filter is
     
     signal fifo_out:            std_logic_vector(8 downto 0);
     signal fifo_count:          std_logic_vector(15 downto 0);
+    signal fifo_valid:          std_logic;
     signal fifo_read:           std_logic;
 begin
     filt0: entity work.RepeatFilter
-        generic map (timeout_g => 1024)
+        generic map (timeout_g => 4096)
         port map (clk, rst_n, enable, data_in, write_in, data_out, write_out);
     
     -- We collect output from the block to a fifo for inspection
     output_fifo: entity work.FIFO
         generic map (width_g => 9, depth_g => 1024)
-        port map (clk, rst_n, fifo_out, fifo_read, data_out, write_out, fifo_count);
+        port map (clk, rst_n, fifo_out, fifo_read, fifo_valid, data_out, write_out, fifo_count);
     
     process
         file input:             text;
@@ -76,7 +77,7 @@ begin
         end loop;
     
         -- Wait for the timeout to make sure everything is written to fifo
-        for i in 0 to 2048 loop
+        for i in 0 to 8192 loop
             clock;
         end loop;
     

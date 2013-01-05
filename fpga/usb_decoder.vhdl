@@ -1,10 +1,11 @@
 -- This is a wrapper around usb_rx_phy to provide a more suitable interface
 -- for protocol analyzer purposes.
 --
--- Output data is 9-bit. Packet begins with timestamp and ends with EOP token.
+-- Output data is 9-bit. Packet begins with payload and ends with timestamp
+-- and EOP token.
 -- The bottom 8 bits are the packet data. Bit 9 marks EOP.
 --
--- [4 bytes timestamp] [Packet data] [1-byte EOP]
+-- [Packet data] [4 bytes timestamp] [1-byte EOP]
 --
 -- The bottom part of the end-of-packet token encodes the following
 -- information:
