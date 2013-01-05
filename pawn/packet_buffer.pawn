@@ -24,6 +24,10 @@ static packet_data_write_ptr = 0;
 static packet_index_erase_ptr = 0;
 static packet_data_erase_ptr = 0;
 
+static bool: filter_repeats = true;
+
+stock buffer_set_rfilt(bool: value) {filter_repeats = value;}
+
 /// Clear packet buffer
 buffer_clear()
 {
@@ -61,11 +65,14 @@ packet_fetch()
         packet_index_erase_ptr = packet_index_write_ptr;
     
     // Check if this was a repeat of previous packets
-    if (check_repeats(1))
-        collapse_repeats(1);
-    
-    if (check_repeats(2))
-        collapse_repeats(2);
+    if (filter_repeats)
+    {
+        if (check_repeats(1))
+            collapse_repeats(1);
+        
+        if (check_repeats(2))
+            collapse_repeats(2);
+    }
 }
 
 /// Check if a packet index is still valid
@@ -163,7 +170,7 @@ packet_timestamp(index)
     if (!packet_read(index, buf, packet_length(index) - 5, 4))
         return -1;
     
-    return buf{0} | (buf{1} << 8) | (buf{2} << 8) | (buf{3} << 8);
+    return buf{0} | (buf{1} << 8) | (buf{2} << 16) | (buf{3} << 24);
 }
 
 /// Remove newest packet from buffer. Used to condense repeats and/or

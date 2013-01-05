@@ -1,5 +1,7 @@
 /// Functions for getting textual descriptions of packets.
 
+new bool: microsecond_timestamps = false;
+
 #define DETAILS_LENGTH 256
 
 const packettype:
@@ -183,7 +185,9 @@ analyze_oneline(index, buf{50})
     buf{0} = 0
     strcat(buf, " ");
     
-    valstr(tmp, packet_timestamp(index));
+    new timestamp = packet_timestamp(index);
+    if (!microsecond_timestamps) timestamp /= 1000;
+    valstr(tmp, timestamp);
     strpad(tmp, 6);
     
     strcat(buf, tmp);
@@ -249,7 +253,15 @@ analyze_oneline(index, buf{50})
         strcat(buf, "PHY ERR");
     }
     
-    // Append repeat count
+    // Check for hardware repeat indicator
+    if (packet{0} & 0x04)
+    {
+        buf{39} = 0;
+        strrpad(buf, 40);
+        strcat(buf, "repeats");
+    }
+    
+    // Append software repeat count
     new repeats = packet_repeats(index);
     if (repeats > 1)
     {

@@ -10,10 +10,18 @@ const addrfiltmode: {
     ADDRFILT_RANGE0 = 3
 }
 
+const repfiltmode: {
+    REPFILT_NONE = 0,
+    REPFILT_SOFT = 1,
+    REPFILT_HARD = 2
+}
+
 static addrfiltmode: addrfilt_mode;
+static addrfilt_mode_labels[]{} = ["None", "Auto (setaddr)", "Range", "Range + addr 0"];
 static minaddr, maxaddr;
 
-static addrfilt_mode_labels[]{} = ["None", "Auto (setaddr)", "Range", "Range + addr 0"];
+static repfiltmode: repfilt_mode;
+static repfilt_mode_labels[]{} = ["None", "Software", "Hardware"];
 
 configure(bool: load_only = false)
 {
@@ -31,7 +39,8 @@ configure(bool: load_only = false)
         
         config_multichoice("addrfilt_mode", "Address filter mode",
             addrfilt_mode, addrfilt_mode_labels, ADDRFILT_SETADDR,  .count = 3,
-            .help = "If there are many devices on the same root hub port, packets send by the host to any device will be visible. Filtering by the device address helps here." ... "\n\nAutomatic mode will filter to the newest enumerated device." ...
+            .help = "If there are many devices on the same root hub port, packets send by the host to any device will be visible. Filtering by the device address helps here." ...
+            "\n\nAutomatic mode will filter to the newest enumerated device." ...
             "\nRange will just compare the address to a range you set." ...
             "\nRange + addr 0 additionally always allows address 0 through, so that you can see the enumeration.");
         
@@ -42,11 +51,25 @@ configure(bool: load_only = false)
             config_integer("minaddr", "Minimum address", minaddr, 0, 0, 127);
             config_integer("maxaddr", "Maximum address", maxaddr, 127, 0, 127);
         }
+        
+        config_multichoice("repfilt_mode", "Repeat filter mode",
+            repfilt_mode, repfilt_mode_labels, REPFILT_HARD, .count = 3,
+            .help = "Repeat filtering collapses repeated sequences of packets, such as long IN chains that occur when host polls for data." ...
+            "\n\nHardware mode is the fastest, but only shows indicator that the packet repeats. Software mode is slower, but shows number of repeated packets."
+        );
+        
+        config_boolean("microseconds", "Microsecond timestamps",
+            microsecond_timestamps, false,
+            .help = "Show microseconds in timestamps (instead of milliseconds)."
+        );
     }
     
     DECODER_CONFIG = decoderconf: 0;
     if (filter_sof) DECODER_CONFIG |= IGNORE_SOF;
     if (filter_pre) DECODER_CONFIG |= IGNORE_PRE;
+    if (repfilt_mode == REPFILT_HARD) DECODER_CONFIG |= REPEATFILT;
+    
+    buffer_set_rfilt(repfilt_mode == REPFILT_SOFT);
 }
 
 @button3()

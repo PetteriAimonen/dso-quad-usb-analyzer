@@ -6,6 +6,7 @@
 
 const decoderconf: {
     READ_FIFO_COUNT = 0x0001, // Read the count register (instead of data)
+    REPEATFILT      = 0x0002,
     IGNORE_SOF      = 0x0100,
     IGNORE_IN       = 0x0200,
     IGNORE_OUT      = 0x0400,
