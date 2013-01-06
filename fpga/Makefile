@@ -4,7 +4,7 @@ VHDL_SOURCE = config.vhdl edge_matcher.vhdl config.vhdl \
 	packet_filter.vhdl fpga_top.vhdl
 
 TESTS = tb_usb_decoder tb_fifo tb_edge_matcher tb_packet_filter \
-	tb_packet_buffer tb_repeat_filter
+	tb_packet_buffer tb_repeat_filter tb_addr_filter
 
 all: syntax_check run_tbs
 
@@ -41,6 +41,10 @@ tb_repeat_filter: fifo.vhdl ramblock.vhdl packet_buffer.vhdl repeat_filter.vhdl 
 	ghdl -a $(GHDL_ARGS) $^
 	ghdl -e $(GHDL_ARGS) $@
 
+tb_addr_filter: fifo.vhdl addr_filter.vhdl std_logic_textio.vhdl tb_addr_filter.vhdl
+	ghdl -a $(GHDL_ARGS) $^
+	ghdl -e $(GHDL_ARGS) $@
+
 run_tbs: $(TESTS)
 	./tb_usb_decoder --assert-level=error
 	./tb_fifo --assert-level=error
@@ -49,3 +53,5 @@ run_tbs: $(TESTS)
 	./tb_packet_buffer --assert-level=error
 	./tb_repeat_filter --assert-level=error
 	diff -w tb_repeat_filter_expected.txt tb_repeat_filter_output.txt
+	./tb_addr_filter --assert-level=error
+	diff -w tb_addr_filter_expected.txt tb_addr_filter_output.txt

@@ -37,21 +37,28 @@ architecture rtl of fpga_top is
     -- Configuration register signals
     signal cfg_read_count:      std_logic;
     signal cfg_rfilter:         std_logic;
+    signal cfg_passzero:        std_logic;
     signal cfg_ign_SOF:         std_logic;
     signal cfg_ign_IN:          std_logic;
     signal cfg_ign_OUT:         std_logic;
     signal cfg_ign_PRE:         std_logic;
     signal cfg_ign_ACK:         std_logic;
     signal cfg_ign_NAK:         std_logic;
+    signal cfg_minaddr:         std_logic_vector(6 downto 0);
+    signal cfg_maxaddr:         std_logic_vector(6 downto 0);
     
     -- USB decoder signals
     signal dec_data:            std_logic_vector(8 downto 0);
     signal dec_write:           std_logic;
     
+    -- Address filter signals
+    signal afilt_data:          std_logic_vector(8 downto 0);
+    signal afilt_write:         std_logic;
+
     -- Packet filter signals
-    signal filt_filter:         std_logic_vector(15 downto 0);
-    signal filt_data:           std_logic_vector(8 downto 0);
-    signal filt_write:          std_logic;
+    signal pfilt_filter:        std_logic_vector(15 downto 0);
+    signal pfilt_data:          std_logic_vector(8 downto 0);
+    signal pfilt_write:         std_logic;
 
     -- Repeat filter signals
     signal rfilt_data:          std_logic_vector(8 downto 0);
@@ -78,8 +85,9 @@ begin
     -- Configuration register
     config1: entity work.Config
         port map (clk, rst_n, fsmc_ce, fsmc_nwr, fsmc_db, 
-            cfg_read_count, cfg_rfilter, cfg_ign_SOF, cfg_ign_IN,
-            cfg_ign_OUT, cfg_ign_PRE, cfg_ign_ACK, cfg_ign_NAK);
+            cfg_read_count, cfg_rfilter, cfg_passzero, cfg_ign_SOF, cfg_ign_IN,
+            cfg_ign_OUT, cfg_ign_PRE, cfg_ign_ACK, cfg_ign_NAK, cfg_minaddr,
+            cfg_maxaddr);
     
     -- Binarization of ADC data.
     -- In 200mV range, din >= 128 gives 1 V threshold voltage
@@ -98,13 +106,18 @@ begin
             ch_ab_matched(1), ch_ab_matched(0), ch_ab_matched(1),
             dec_data, dec_write);
     
+    -- Address filter
+    afilt1: entity work.AddrFilter
+        port map (clk, rst_n, cfg_minaddr, cfg_maxaddr, cfg_passzero,
+            dec_data, dec_write, afilt_data, afilt_write);
+
     -- Packet filter
-    filt1: entity work.PacketFilter
-        port map (clk, rst_n, filt_filter, dec_data, dec_write,
-            filt_data, filt_write);
+    pfilt1: entity work.PacketFilter
+        port map (clk, rst_n, pfilt_filter, afilt_data, afilt_write,
+            pfilt_data, pfilt_write);
     
     -- Filtered packet types
-    filt_filter <= (
+    pfilt_filter <= (
         1 => cfg_ign_OUT,
         2 => cfg_ign_ACK,
         5 => cfg_ign_SOF,
@@ -116,7 +129,7 @@ begin
     
     -- Repeated packet filter
     rfilt1: entity work.RepeatFilter
-        port map (clk, rst_n, cfg_rfilter, filt_data, filt_write,
+        port map (clk, rst_n, cfg_rfilter, pfilt_data, pfilt_write,
             rfilt_data, rfilt_write);
 
     -- FIFO storage of data
