@@ -30,7 +30,7 @@ architecture testbench of tb_usb_decoder is
     signal buffer_r:    OutArray;
 begin
     dec1: entity work.USBDecoder
-        port map (clk, rst_n, dplus, dminus, ddiff, data_out, write);
+        port map (clk, rst_n, '1', dplus, dminus, ddiff, data_out, write);
     
     ddiff <= dplus;
     
@@ -105,8 +105,8 @@ begin
             end if;
         end loop;
         
-        assert idx_v = 5 report "Reset packet length is wrong";
-        assert buffer_r(4) = "1" & X"02" report "Reset EOP wrong";
+        assert idx_v = 6 report "Reset packet length is wrong";
+        assert buffer_r(5) = "1" & X"02" report "Reset EOP wrong";
         
         report "Simulation ended" severity note;
         wait;

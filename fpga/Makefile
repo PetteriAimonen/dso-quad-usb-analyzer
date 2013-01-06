@@ -1,7 +1,7 @@
 VHDL_SOURCE = config.vhdl edge_matcher.vhdl config.vhdl \
 	fifo.vhdl usb_rx_phy.vhdl usb_decoder.vhdl \
 	ramblock.vhdl packet_buffer.vhdl repeat_filter.vhdl \
-	packet_filter.vhdl fpga_top.vhdl
+	packet_filter.vhdl addr_filter.vhdl fpga_top.vhdl
 
 TESTS = tb_usb_decoder tb_fifo tb_edge_matcher tb_packet_filter \
 	tb_packet_buffer tb_repeat_filter tb_addr_filter

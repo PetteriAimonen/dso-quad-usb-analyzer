@@ -34,8 +34,8 @@ redraw_all()
 @button1()
 {
     get_keys(ANY_KEY);
-    draw_menubar("TXT", "BMP", "", "");
-    while (!peek_keys(BUTTON1 | BUTTON2)) { }
+    draw_menubar("TXT", "BMP", "RAW", "");
+    while (!peek_keys(BUTTON1 | BUTTON2 | BUTTON3)) { }
     
     if (get_keys(BUTTON1))
     {
@@ -72,6 +72,39 @@ redraw_all()
             draw_menubar("Saved ", "", filename);
         else
             draw_menubar("Bitmap save failed!");
+        
+        delay_ms(500);
+    }
+    else if (get_keys(BUTTON3))
+    {
+        new filename{14} = "USBRAW%02d.TXT";
+        select_filename(filename);
+        draw_menubar("Saving", "", filename);
+        
+        new File: file = f_open(filename, FA_CREATE_NEW | FA_WRITE);
+        
+        new index = packet_get_oldest();
+        while (packet_valid(index))
+        {
+            new length = packet_length(index);
+            for (new i = 0; i < length; i++)
+            {
+                new buf{1};
+                packet_read(index, buf, i, 1);
+                new sbuf{4};
+                valstr(sbuf, buf{0}, .base = 16, .minlength = 2);
+                strcat(sbuf, " ");
+                f_write(file, sbuf);
+            }
+            
+            f_write(file, "\r\n");
+            index++;
+        }
+        
+        if (f_close(file))
+            draw_menubar("Saved", filename);
+        else
+            draw_menubar("File error!");
         
         delay_ms(500);
     }

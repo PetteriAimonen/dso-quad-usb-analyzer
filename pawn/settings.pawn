@@ -5,9 +5,9 @@ static bool: filter_pre;
 
 const addrfiltmode: {
     ADDRFILT_NONE = 0,
-    ADDRFILT_SETADDR = 1,
-    ADDRFILT_RANGE = 2,
-    ADDRFILT_RANGE0 = 3
+//    ADDRFILT_SETADDR = 1,
+    ADDRFILT_RANGE = 1,
+    ADDRFILT_RANGE0 = 2
 }
 
 const repfiltmode: {
@@ -17,7 +17,7 @@ const repfiltmode: {
 }
 
 static addrfiltmode: addrfilt_mode;
-static addrfilt_mode_labels[]{} = ["None", "Auto (setaddr)", "Range", "Range + addr 0"];
+static addrfilt_mode_labels[]{} = ["None", "Range", "Range + addr 0"];
 static minaddr, maxaddr;
 
 static repfiltmode: repfilt_mode;
@@ -38,9 +38,9 @@ configure(bool: load_only = false)
             .help = "PREamble packets signify low-speed communication. This program doesn't support decoding them yet, so you probably want to filter them.");
         
         config_multichoice("addrfilt_mode", "Address filter mode",
-            addrfilt_mode, addrfilt_mode_labels, ADDRFILT_SETADDR,  .count = 3,
+            addrfilt_mode, addrfilt_mode_labels, ADDRFILT_NONE,  .count = 3,
             .help = "If there are many devices on the same root hub port, packets send by the host to any device will be visible. Filtering by the device address helps here." ...
-            "\n\nAutomatic mode will filter to the newest enumerated device." ...
+         //   "\n\nAutomatic mode will filter to the newest enumerated device." ...
             "\nRange will just compare the address to a range you set." ...
             "\nRange + addr 0 additionally always allows address 0 through, so that you can see the enumeration.");
         
@@ -64,10 +64,23 @@ configure(bool: load_only = false)
         );
     }
     
-    DECODER_CONFIG = decoderconf: 0;
+    DECODER_CONFIG = ENABLE_USB;
     if (filter_sof) DECODER_CONFIG |= IGNORE_SOF;
     if (filter_pre) DECODER_CONFIG |= IGNORE_PRE;
     if (repfilt_mode == REPFILT_HARD) DECODER_CONFIG |= REPEATFILT;
+    if (addrfilt_mode == ADDRFILT_RANGE0) DECODER_CONFIG |= PASSZERO;
+    
+    if (addrfilt_mode == ADDRFILT_NONE)
+    {
+        DECODER_MINADDR = 0;
+        DECODER_MAXADDR = 127;
+    }
+    else if (addrfilt_mode == ADDRFILT_RANGE ||
+             addrfilt_mode == ADDRFILT_RANGE0)
+    {
+        DECODER_MINADDR = minaddr;
+        DECODER_MAXADDR = maxaddr;
+    }
     
     buffer_set_rfilt(repfilt_mode == REPFILT_SOFT);
 }

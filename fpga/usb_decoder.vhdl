@@ -23,6 +23,8 @@ entity USBDecoder is
         clk:            in std_logic;
         rst_n:          in std_logic;
         
+        enable:         in std_logic;
+        
         -- D+, D- and the resolved differential signal.
         dplus:          in std_logic;
         dminus:         in std_logic;
@@ -61,7 +63,7 @@ architecture rtl of USBDecoder is
     signal packettime_r: std_logic_vector(31 downto 0);
     
     -- State machine for writing the packet.
-    type State is (IDLE, PAYLOAD, TIME1, TIME2, TIME3, TIME4, EOP);
+    type State is (IDLE, PAYLOAD, RESET_WAIT, TIME1, TIME2, TIME3, TIME4, EOP);
     signal state_r: State;
 begin
     phy1: entity work.usb_rx_phy
@@ -82,7 +84,7 @@ begin
     
     data_out <= data_out_r;
     write <= write_r;
-    phy_enable <= '1';
+    phy_enable <= enable;
     
     process (clk, rst_n)
     begin
@@ -128,9 +130,12 @@ begin
                         state_r <= PAYLOAD;
                     end if;
                 
-                    if (dplus = '1' or dminus = '1') and reset_r = '1' then
+                    if (dplus = '1' or dminus = '1') and reset_r = '1'
+                       and prescaler_r = 71 then
                         -- Report the USB reset when it ends
-                        state_r <= TIME1;
+                        state_r <= RESET_WAIT;
+                        data_out_r <= "000000000";
+                        write_r <= '1';
                     end if;
                 
                 when PAYLOAD =>
@@ -142,6 +147,16 @@ begin
                     if phy_active = '0' then
                         state_r <= TIME1;
                     end if;
+                
+                when RESET_WAIT =>
+                    -- A small wait after the fake PID of reset notification.
+                    -- This is to allow downstream filters time to process it.
+                    write_r <= '0';
+                    data_out_r <= (others => '-');
+                    if prescaler_r = 71 then
+                        state_r <= TIME1;
+                    end if;
+                    
                 
                 when TIME1 =>
                     data_out_r <= "0" & packettime_r(7 downto 0);

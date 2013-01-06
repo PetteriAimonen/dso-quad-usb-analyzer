@@ -73,8 +73,8 @@ architecture rtl of PacketBuffer is
     signal shift_r:     unsigned(1 downto 0);
     
     -- Packet read timeout counter
-    signal prescaler_r: unsigned(12 downto 0);
-    constant timeout_c: integer := (timeout_g + 4095) / 4096;
+    signal prescaler_r: unsigned(14 downto 0);
+    constant timeout_c: integer := (timeout_g + 16383) / 16384;
     signal timeout_r:   integer range 0 to timeout_c;
     signal timeouted_r: std_logic;
     
@@ -154,8 +154,8 @@ begin
             prescaler_r <= prescaler_r + 1;
             
             if timeout_r /= 0 then
-                if prescaler_r(12) = '1' then
-                    prescaler_r(12) <= '0';
+                if prescaler_r(14) = '1' then
+                    prescaler_r(14) <= '0';
                     timeout_r <= timeout_r - 1;
                 end if;
             else

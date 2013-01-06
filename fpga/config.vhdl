@@ -2,19 +2,15 @@
 --
 -- The top 2 bits select the register:
 -- 00: Main config
--- 01: Addr filter minimum address
--- 02: Addr filter maximum address
+-- 01: Addr filter min & max address
 --
 -- Main configuration bits:
 --  0: Read FIFO data (0) or FIFO count (1)
---  1: Enable repeat filter
---  2: Always let addr 0 through in addrfilt
---  8: Ignore SOF tokens
---  9: Ignore IN tokens
--- 10: Ignore OUT tokens
--- 11: Ignore PRE packets
--- 12: Ignore ACK packets
--- 13: Ignore NAK packets
+--  1: Enable USB decoder
+--  2: Enable repeat filter
+--  3: Always let addr 0 through in addrfilt
+--  8: Ignore SOF packets
+--  9: Ignore PRE packets
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -29,14 +25,11 @@ entity Config is
         fsmc_db:        in std_logic_vector(15 downto 0);
 
         cfg_read_count: out std_logic;
+        cfg_enable:     out std_logic;
         cfg_rfilter:    out std_logic;
         cfg_passzero:   out std_logic;
         cfg_ign_SOF:    out std_logic;
-        cfg_ign_IN:     out std_logic;
-        cfg_ign_OUT:    out std_logic;
         cfg_ign_PRE:    out std_logic;
-        cfg_ign_ACK:    out std_logic;
-        cfg_ign_NAK:    out std_logic;
         
         cfg_minaddr:    out std_logic_vector(6 downto 0);
         cfg_maxaddr:    out std_logic_vector(6 downto 0)
@@ -49,14 +42,11 @@ architecture rtl of Config is
     signal maxaddr_r:   std_logic_vector(6 downto 0);
 begin
     cfg_read_count <= config_r(0);
-    cfg_rfilter <= config_r(1);
-    cfg_passzero <= config_r(2);
+    cfg_enable <= config_r(1);
+    cfg_rfilter <= config_r(2);
+    cfg_passzero <= config_r(3);
     cfg_ign_SOF <= config_r(8);
-    cfg_ign_IN  <= config_r(9);
-    cfg_ign_OUT <= config_r(10);
-    cfg_ign_PRE <= config_r(11);
-    cfg_ign_ACK <= config_r(12);
-    cfg_ign_NAK <= config_r(13);
+    cfg_ign_PRE <= config_r(9);
     cfg_minaddr <= minaddr_r;
     cfg_maxaddr <= maxaddr_r;
     
@@ -72,8 +62,7 @@ begin
                     config_r <= fsmc_db(13 downto 0);
                 elsif fsmc_db(15 downto 14) = "01" then
                     minaddr_r <= fsmc_db(6 downto 0);
-                elsif fsmc_db(15 downto 14) = "10" then
-                    maxaddr_r <= fsmc_db(6 downto 0);
+                    maxaddr_r <= fsmc_db(13 downto 7);
                 end if;
             end if;
         end if;

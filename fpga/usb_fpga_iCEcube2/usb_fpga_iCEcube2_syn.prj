@@ -15,6 +15,7 @@ add_file -vhdl -lib work "../packet_filter.vhdl"
 add_file -vhdl -lib work "../ramblock.vhdl"
 add_file -vhdl -lib work "../repeat_filter.vhdl"
 add_file -vhdl -lib work "../packet_buffer.vhdl"
+add_file -vhdl -lib work "../addr_filter.vhdl"
 add_file -constraint -lib work "../timing_contraints.sdc"
 #implementation: "usb_fpga_iCEcube2_Implmnt"
 impl -add usb_fpga_iCEcube2_Implmnt -type fpga

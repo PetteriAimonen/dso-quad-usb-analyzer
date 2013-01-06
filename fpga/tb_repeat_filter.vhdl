@@ -77,7 +77,7 @@ begin
         end loop;
     
         -- Wait for the timeout to make sure everything is written to fifo
-        for i in 0 to 8192 loop
+        for i in 0 to 16384 loop
             clock;
         end loop;
     

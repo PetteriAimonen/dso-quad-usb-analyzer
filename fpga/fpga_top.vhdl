@@ -36,14 +36,11 @@ architecture rtl of fpga_top is
     
     -- Configuration register signals
     signal cfg_read_count:      std_logic;
+    signal cfg_enable:          std_logic;
     signal cfg_rfilter:         std_logic;
     signal cfg_passzero:        std_logic;
     signal cfg_ign_SOF:         std_logic;
-    signal cfg_ign_IN:          std_logic;
-    signal cfg_ign_OUT:         std_logic;
     signal cfg_ign_PRE:         std_logic;
-    signal cfg_ign_ACK:         std_logic;
-    signal cfg_ign_NAK:         std_logic;
     signal cfg_minaddr:         std_logic_vector(6 downto 0);
     signal cfg_maxaddr:         std_logic_vector(6 downto 0);
     
@@ -85,9 +82,8 @@ begin
     -- Configuration register
     config1: entity work.Config
         port map (clk, rst_n, fsmc_ce, fsmc_nwr, fsmc_db, 
-            cfg_read_count, cfg_rfilter, cfg_passzero, cfg_ign_SOF, cfg_ign_IN,
-            cfg_ign_OUT, cfg_ign_PRE, cfg_ign_ACK, cfg_ign_NAK, cfg_minaddr,
-            cfg_maxaddr);
+            cfg_read_count, cfg_enable, cfg_rfilter, cfg_passzero,
+            cfg_ign_SOF, cfg_ign_PRE, cfg_minaddr, cfg_maxaddr);
     
     -- Binarization of ADC data.
     -- In 200mV range, din >= 128 gives 1 V threshold voltage
@@ -102,7 +98,7 @@ begin
     
     -- USB signalling decoder
     dec1: entity work.USBDecoder
-        port map (clk, rst_n,
+        port map (clk, rst_n, cfg_enable,
             ch_ab_matched(1), ch_ab_matched(0), ch_ab_matched(1),
             dec_data, dec_write);
     
@@ -118,11 +114,7 @@ begin
     
     -- Filtered packet types
     pfilt_filter <= (
-        1 => cfg_ign_OUT,
-        2 => cfg_ign_ACK,
         5 => cfg_ign_SOF,
-        9 => cfg_ign_IN,
-        10 => cfg_ign_NAK,
         12 => cfg_ign_PRE,
         others => '0'
     );

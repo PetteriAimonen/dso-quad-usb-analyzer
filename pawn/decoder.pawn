@@ -6,16 +6,16 @@
 
 const decoderconf: {
     READ_FIFO_COUNT = 0x0001, // Read the count register (instead of data)
-    REPEATFILT      = 0x0002,
+    ENABLE_USB      = 0x0002
+    REPEATFILT      = 0x0004, // Enable repeat filter
+    PASSZERO        = 0x0008, // Always pass addr 0
     IGNORE_SOF      = 0x0100,
-    IGNORE_IN       = 0x0200,
-    IGNORE_OUT      = 0x0400,
-    IGNORE_PRE      = 0x0800,
-    IGNORE_ACK      = 0x1000,
-    IGNORE_NAK      = 0x2000
+    IGNORE_PRE      = 0x0200
 }
 
-new decoderconf: DECODER_CONFIG = IGNORE_SOF | IGNORE_PRE;
+new decoderconf: DECODER_CONFIG = ENABLE_USB | IGNORE_SOF | IGNORE_PRE;
+new DECODER_MINADDR = 0;
+new DECODER_MAXADDR = 127;
 
 /// Load the FPGA image and initialize it.
 bool: decoder_initialize()
@@ -63,8 +63,9 @@ decoder_set_config(decoderconf: value)
 {
     DECODER_CONFIG = value;
     
-    new buffer[1];
+    new buffer[2];
     buffer[0] = value;
+    buffer[1] = 0x4000 | (DECODER_MAXADDR << 7) | DECODER_MINADDR;
     fpga_write(buffer);
 }
 

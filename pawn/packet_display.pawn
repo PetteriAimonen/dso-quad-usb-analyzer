@@ -62,6 +62,7 @@ display_redraw()
     
     if (selected_index < 0)
     {
+        fill_rectangle(0, 206, screenwidth, 206, black);
         draw_text("Ready to capture some USB packets!", 200, 160, white, black, true);
         draw_text("Channel A = D-, Channel B = D+", 200, 140, white, black, true);
         return;
