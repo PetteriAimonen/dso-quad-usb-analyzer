@@ -52,10 +52,10 @@ new packettype_strings[]{} = [
 packettype: analyze_packet_type(index)
 {
     new buf{1};
-    if (packet_length(index) == 5)
+    if (packet_length(index) == 6)
     {
         // Just the timestamp and EOP token
-        assert(packet_read(index, buf, 4, 1));
+        assert(packet_read(index, buf, 5, 1));
         if (buf{0} & 0x02)
             return PT_RESET;
     }
@@ -76,9 +76,6 @@ packettype: analyze_packet_type(index)
 /* Detailed analysis for setup packets */
 static bool: describe_setup(buf{DETAILS_LENGTH}, index)
 {
-    if (analyze_packet_type(index) != PT_DATA0)
-        return false;
-    
     if (analyze_packet_type(index - 1) != PT_SETUP)
         return false;
     
@@ -120,9 +117,9 @@ static bool: describe_setup(buf{DETAILS_LENGTH}, index)
         case 0x0680:
         {
             strcat(buf, "Get descriptor ");
-            strcat(buf, str(value >> 8));
-            strcat(buf, " type ");
             strcat(buf, str(value & 0xFF));
+            strcat(buf, " type ");
+            strcat(buf, str(value >> 8));
             if (indexv != 0)
             {
                 strcat(buf, " lang ");
@@ -158,9 +155,90 @@ static bool: describe_setup(buf{DETAILS_LENGTH}, index)
     return true;
 }
 
+/* Detailed analysis for string descriptors */
+static bool: describe_string_descriptor(buf{DETAILS_LENGTH}, index)
+{
+    new packet{64};
+    
+    // Check if this has the header for a string descriptor
+    if (!packet_read(index, packet, 1, 2) || packet{1} != 0x03)
+        return false;
+    
+    // Find index of setup packet
+    new i = index;
+    do
+    {
+        i--;
+        if (!packet_valid(i) || i < index - 10)
+            return false;
+    } while (analyze_packet_type(i) != PT_SETUP);
+    
+    // Check setup request contents
+    i++;
+    if (analyze_packet_type(i) != PT_DATA0)
+        return false;
+    
+    if (!packet_read(i, packet, 1, 8))
+        return false;
+    
+    new request = (packet{1} << 8) | packet{0};
+    new value = (packet{3} << 8) | packet{2};
+    
+    // Verify that it is a descriptor read request, for the type 3, but not
+    // index 0 (string descriptor 0 is a language index).
+    if (request != 0x0680 || (value >> 8) != 3 || (value & 0xFF) == 0)
+        return false;
+    
+    // Now decode the descriptor
+    new length = packet_length(index) - 10; // Minus packet type, header, crc, timestamp, eop
+    if (!packet_read(index, packet, 3, length))
+        return false;
+    
+    // Decode to ascii
+    buf{0} = 0;
+    strcat(buf, "\"");
+    i = 1;
+    for (new j = 0; j < length; j += 2)
+    {
+        buf{i++} = packet{j};
+    }
+    strcat(buf, "\"");
+    return true;
+}
+
+static bool: describe_binary(buf{DETAILS_LENGTH}, index)
+{
+    new packet{16};
+    new tmp{16};
+    
+    new payload_len = packet_length(index) - 8; // Minus packet type, 16-bit crc, timestamp, eop
+    new count = min(payload_len, 8);
+    if (!packet_read(index, packet, 1, count))
+        return false;
+    
+    buf{0} = 0;
+    for (new i = 0; i < count; i++)
+    {
+        valstr(tmp, packet{i}, .base = 16, .minlength = 2);
+        strcat(buf, tmp);
+        strcat(buf, " ");
+    }
+    
+    if (payload_len > count)
+    {
+        strcat(buf, "... total ");
+        strcat(buf, str(payload_len));
+    }
+    
+    return true;
+}
+
+// This is called for decoding the contents of data packets.
 bool: packet_describe(buf{DETAILS_LENGTH}, index)
 {
-    return describe_setup(buf, index);
+    return describe_setup(buf, index) ||
+           describe_string_descriptor(buf, index) ||
+           describe_binary(buf, index);
 }
 
 /*****************************************************************
@@ -220,27 +298,11 @@ analyze_oneline(index, buf{50})
         strcat(buf, ", endp ");
         strcat(buf, str(endp));
     }
-    else if (packet_describe(description, index))
-    {
-        strcat(buf, description);
-    }
     else if (type == PT_DATA0 || type == PT_DATA1)
     {
-        new payload_len = length - 8; // Minus packet type, 16-bit crc, timestamp, eop
-        new count = min(payload_len, 8);
-        packet_read(index, packet, 1, count);
-            
-        for (new i = 0; i < count; i++)
+        if (packet_describe(description, index))
         {
-            valstr(tmp, packet{i}, .base = 16, .minlength = 2);
-            strcat(buf, tmp);
-            strcat(buf, " ");
-        }
-        
-        if (payload_len > count)
-        {
-            strcat(buf, "... total ");
-            strcat(buf, str(payload_len));
+            strcat(buf, description);
         }
     }
     

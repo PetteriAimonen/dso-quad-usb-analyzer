@@ -62,7 +62,7 @@ display_redraw()
     
     if (selected_index < 0)
     {
-        fill_rectangle(0, 206, screenwidth, 206, black);
+        fill_rectangle(0, 0, screenwidth, 220, black);
         draw_text("Ready to capture some USB packets!", 200, 160, white, black, true);
         draw_text("Channel A = D-, Channel B = D+", 200, 140, white, black, true);
         return;
@@ -72,6 +72,20 @@ display_redraw()
     {
         display_render_row(i);
     }
+}
+
+@scroll1(delta)
+{
+    if (delta > 0 && packet_valid(selected_index + 15))
+    {
+        selected_index += 15;
+    }
+    else if (delta < 0 && packet_valid(selected_index - 15))
+    {
+        selected_index -= 15;
+    }
+    
+    display_redraw();
 }
 
 @scroll2(delta)

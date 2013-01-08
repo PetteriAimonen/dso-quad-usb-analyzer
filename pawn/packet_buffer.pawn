@@ -2,15 +2,15 @@
 
 /// Packet contents.
 /// Normal byte stream, with end-of-packet info last.
-static packet_data{4096};
-static const packet_data_len = 4096;
-static const packet_data_mask = 4095;
+static packet_data{8192};
+static const packet_data_len = 8192;
+static const packet_data_mask = 8191;
 
 /// Index of captured packets (start positions and packet lengths)
-static packet_index_start_pos[256];
-static packet_index_length[256]; // Low word = length, high word = repeats
-static const packet_index_len = 256;
-static const packet_index_mask = 255;
+static packet_index_start_pos[512];
+static packet_index_length[512]; // Low word = length, high word = repeats
+static const packet_index_len = 512;
+static const packet_index_mask = 511;
 
 /// Next packet to write.
 /// These will increase endlessly, and the lowest N bits are used
@@ -24,9 +24,8 @@ static packet_data_write_ptr = 0;
 static packet_index_erase_ptr = 0;
 static packet_data_erase_ptr = 0;
 
-static bool: filter_repeats = true;
-
-stock buffer_set_rfilt(bool: value) {filter_repeats = value;}
+new bool: SOFTWARE_REPEAT_FILTER = false;
+new bool: STOP_WHEN_FULL = false;
 
 /// Clear packet buffer
 buffer_clear()
@@ -39,8 +38,20 @@ buffer_clear()
 }
 
 /// Fetch a packet from the decoder and add it to the packet buffer.
-packet_fetch()
+bool: packet_fetch()
 {
+    if (STOP_WHEN_FULL &&
+            (packet_index_write_ptr >= packet_index_len ||
+             packet_data_write_ptr >= packet_data_len - 256))
+    {
+        return false;
+    }
+    
+    if (decoder_count() == 0)
+    {
+        return false;
+    }
+    
     new length;
     new start_pos = packet_data_write_ptr;
     new start_pos_i = (start_pos & packet_data_mask);
@@ -65,7 +76,7 @@ packet_fetch()
         packet_index_erase_ptr = packet_index_write_ptr;
     
     // Check if this was a repeat of previous packets
-    if (filter_repeats)
+    if (SOFTWARE_REPEAT_FILTER)
     {
         if (check_repeats(1))
             collapse_repeats(1);
@@ -73,6 +84,8 @@ packet_fetch()
         if (check_repeats(2))
             collapse_repeats(2);
     }
+    
+    return true;
 }
 
 /// Check if a packet index is still valid

@@ -72,9 +72,8 @@ details_show(index)
     while (!get_keys(BUTTON1))
     {
         // Poll the decoder, to avoid buffer overflowing
-        while (decoder_count() != 0)
+        while (packet_fetch())
         {
-            packet_fetch();
         }
         
         if (peek_keys(SCROLL2_RIGHT | SCROLL2_LEFT))

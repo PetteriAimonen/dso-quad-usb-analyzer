@@ -10,15 +10,15 @@ const addrfiltmode: {
     ADDRFILT_RANGE0 = 2
 }
 
+static addrfiltmode: addrfilt_mode;
+static addrfilt_mode_labels[]{} = ["None", "Range", "Range + addr 0"];
+static minaddr, maxaddr;
+
 const repfiltmode: {
     REPFILT_NONE = 0,
     REPFILT_SOFT = 1,
     REPFILT_HARD = 2
 }
-
-static addrfiltmode: addrfilt_mode;
-static addrfilt_mode_labels[]{} = ["None", "Range", "Range + addr 0"];
-static minaddr, maxaddr;
 
 static repfiltmode: repfilt_mode;
 static repfilt_mode_labels[]{} = ["None", "Software", "Hardware"];
@@ -58,6 +58,10 @@ configure(bool: load_only = false)
             "\n\nHardware mode is the fastest, but only shows indicator that the packet repeats. Software mode is slower, but shows number of repeated packets."
         );
         
+        config_boolean("stopwhenfull", "Stop when full",
+                       STOP_WHEN_FULL, true,
+                       .help = "Stop capture when buffer is full.");
+        
         config_boolean("microseconds", "Microsecond timestamps",
             microsecond_timestamps, false,
             .help = "Show microseconds in timestamps (instead of milliseconds)."
@@ -82,7 +86,7 @@ configure(bool: load_only = false)
         DECODER_MAXADDR = maxaddr;
     }
     
-    buffer_set_rfilt(repfilt_mode == REPFILT_SOFT);
+    SOFTWARE_REPEAT_FILTER = (repfilt_mode == REPFILT_SOFT);
 }
 
 @button3()
