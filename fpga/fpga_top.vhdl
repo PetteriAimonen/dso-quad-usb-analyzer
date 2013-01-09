@@ -39,6 +39,7 @@ architecture rtl of fpga_top is
     signal cfg_enable:          std_logic;
     signal cfg_rfilter:         std_logic;
     signal cfg_passzero:        std_logic;
+    signal cfg_followaddr:      std_logic;
     signal cfg_ign_SOF:         std_logic;
     signal cfg_ign_PRE:         std_logic;
     signal cfg_minaddr:         std_logic_vector(6 downto 0);
@@ -48,9 +49,14 @@ architecture rtl of fpga_top is
     signal dec_data:            std_logic_vector(8 downto 0);
     signal dec_write:           std_logic;
     
+    -- Address follower signals
+    signal aflw_addr:           std_logic_vector(6 downto 0);
+    
     -- Address filter signals
     signal afilt_data:          std_logic_vector(8 downto 0);
     signal afilt_write:         std_logic;
+    signal afilt_minaddr:       std_logic_vector(6 downto 0);
+    signal afilt_maxaddr:       std_logic_vector(6 downto 0);
 
     -- Packet filter signals
     signal pfilt_filter:        std_logic_vector(15 downto 0);
@@ -83,7 +89,8 @@ begin
     config1: entity work.Config
         port map (clk, rst_n, fsmc_ce, fsmc_nwr, fsmc_db, 
             cfg_read_count, cfg_enable, cfg_rfilter, cfg_passzero,
-            cfg_ign_SOF, cfg_ign_PRE, cfg_minaddr, cfg_maxaddr);
+            cfg_followaddr, cfg_ign_SOF, cfg_ign_PRE,
+            cfg_minaddr, cfg_maxaddr);
     
     -- Binarization of ADC data.
     -- In 200mV range, din >= 128 gives 1 V threshold voltage
@@ -102,11 +109,18 @@ begin
             ch_ab_matched(1), ch_ab_matched(0), ch_ab_matched(1),
             dec_data, dec_write);
     
+    -- Address follower
+    aflw1: entity work.AddrFollower
+        port map (clk, rst_n, dec_data, dec_write, aflw_addr);
+    
     -- Address filter
     afilt1: entity work.AddrFilter
-        port map (clk, rst_n, cfg_minaddr, cfg_maxaddr, cfg_passzero,
+        port map (clk, rst_n, afilt_minaddr, afilt_maxaddr, cfg_passzero,
             dec_data, dec_write, afilt_data, afilt_write);
-
+    
+    afilt_minaddr <= aflw_addr when cfg_followaddr = '1' else cfg_minaddr;
+    afilt_maxaddr <= aflw_addr when cfg_followaddr = '1' else cfg_maxaddr;
+    
     -- Packet filter
     pfilt1: entity work.PacketFilter
         port map (clk, rst_n, pfilt_filter, afilt_data, afilt_write,

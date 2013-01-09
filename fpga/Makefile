@@ -1,10 +1,10 @@
 VHDL_SOURCE = config.vhdl edge_matcher.vhdl config.vhdl \
 	fifo.vhdl usb_rx_phy.vhdl usb_decoder.vhdl \
 	ramblock.vhdl packet_buffer.vhdl repeat_filter.vhdl \
-	packet_filter.vhdl addr_filter.vhdl fpga_top.vhdl
+	packet_filter.vhdl addr_filter.vhdl addr_follower.vhdl fpga_top.vhdl
 
 TESTS = tb_usb_decoder tb_fifo tb_edge_matcher tb_packet_filter \
-	tb_packet_buffer tb_repeat_filter tb_addr_filter
+	tb_packet_buffer tb_repeat_filter tb_addr_filter tb_addr_follower
 
 all: syntax_check run_tbs
 
@@ -45,6 +45,10 @@ tb_addr_filter: fifo.vhdl addr_filter.vhdl std_logic_textio.vhdl tb_addr_filter.
 	ghdl -a $(GHDL_ARGS) $^
 	ghdl -e $(GHDL_ARGS) $@
 
+tb_addr_follower: addr_follower.vhdl tb_addr_follower.vhdl
+	ghdl -a $(GHDL_ARGS) $^
+	ghdl -e $(GHDL_ARGS) $@
+
 run_tbs: $(TESTS)
 	./tb_usb_decoder --assert-level=error
 	./tb_fifo --assert-level=error
@@ -55,3 +59,4 @@ run_tbs: $(TESTS)
 	diff -w tb_repeat_filter_expected.txt tb_repeat_filter_output.txt
 	./tb_addr_filter --assert-level=error
 	diff -w tb_addr_filter_expected.txt tb_addr_filter_output.txt
+	./tb_addr_follower --assert-level=error

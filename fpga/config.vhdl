@@ -9,6 +9,7 @@
 --  1: Enable USB decoder
 --  2: Enable repeat filter
 --  3: Always let addr 0 through in addrfilt
+--  4: Follow newest device for addrfilt
 --  8: Ignore SOF packets
 --  9: Ignore PRE packets
 
@@ -28,6 +29,7 @@ entity Config is
         cfg_enable:     out std_logic;
         cfg_rfilter:    out std_logic;
         cfg_passzero:   out std_logic;
+        cfg_followaddr: out std_logic;
         cfg_ign_SOF:    out std_logic;
         cfg_ign_PRE:    out std_logic;
         
@@ -45,6 +47,7 @@ begin
     cfg_enable <= config_r(1);
     cfg_rfilter <= config_r(2);
     cfg_passzero <= config_r(3);
+    cfg_followaddr <= config_r(4);
     cfg_ign_SOF <= config_r(8);
     cfg_ign_PRE <= config_r(9);
     cfg_minaddr <= minaddr_r;
