@@ -1,0 +1,30 @@
+# Last byte of each row is the expected address output from the block.
+# USB reset
+00 06 56 40 00 02 00
+
+# Some other setup requests
+2D 01 E8 92 69 40 00 00 00
+C3 A3 00 00 00 03 00 04 00 F7 1D 96 69 40 00 00 00
+69 01 E8 A3 69 40 00 04 00
+69 01 E8 11 6B 40 00 00 00
+D2 1A 6B 40 00 00 00
+E1 01 E8 1C 6B 40 00 00 00
+4B 00 00 20 6B 40 00 00 00
+2D 01 E8 55 44 41 00 00 00
+C3 23 01 14 00 03 00 00 00 EE 69 58 44 41 00 00 00
+69 01 E8 64 44 41 00 04 00
+69 01 E8 9F 45 41 00 00 00
+D2 A6 45 41 00 00 00
+
+# Address set
+2D 00 10 D0 45 41 00 00 00
+C3 00 05 15 00 00 00 00 00 E8 31 D3 45 41 00 00 00
+D2 DC 45 41 00 00 15
+
+# Some traffic to new address
+69 00 10 DE 45 41 00 00 15
+4B 00 00 E1 45 41 00 00 15
+D2 E5 45 41 00 00 15
+
+# USB reset brings address back to 0
+00 06 56 40 00 02 00
