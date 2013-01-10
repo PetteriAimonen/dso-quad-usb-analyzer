@@ -23,6 +23,15 @@ static const Color: packetcolors[][] = [
     [red, white]                // PT_RESET
 ];
 
+static row_cache[16]{50};
+static row_indices[16] = [-1, ...];
+
+display_reset()
+{
+    for (new i = 0; i < 16; i++)
+        row_indices[i] = -1;
+}
+
 /// Re-render given row of display (0 to 14)
 display_render_row(row)
 {
@@ -39,12 +48,16 @@ display_render_row(row)
     }
     
     new packettype: type = analyze_packet_type(index);
-    new buf{50};
-    analyze_oneline(index, buf);
-    strrpad(buf, 50);
-    
     new Color: bgcolor = packetcolors[type][0];
     new Color: fgcolor = packetcolors[type][1];
+    
+    new cacheidx = index & 15;
+    if (row_indices[cacheidx] != index)
+    {
+        analyze_oneline(index, row_cache[cacheidx]);
+        strrpad(row_cache[cacheidx], 50);
+        row_indices[cacheidx] = index;
+    }
     
     if (index == selected_index)
     {
@@ -52,7 +65,7 @@ display_render_row(row)
         fgcolor = blend(fgcolor, white, FIX(0.3));
     }
     
-    draw_text(buf, 0, y, fgcolor, bgcolor);
+    draw_text(row_cache[cacheidx], 0, y, fgcolor, bgcolor);
 }
 
 display_redraw()

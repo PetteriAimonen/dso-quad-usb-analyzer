@@ -114,6 +114,7 @@ redraw_all()
 @button2()
 {
     buffer_clear();
+    display_reset();
     redraw_all();
 }
 

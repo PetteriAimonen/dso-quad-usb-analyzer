@@ -169,7 +169,7 @@ static bool: describe_string_descriptor(buf{DETAILS_LENGTH}, index)
     do
     {
         i--;
-        if (!packet_valid(i) || i < index - 10)
+        if (!packet_valid(i) || i < index - 5)
             return false;
     } while (analyze_packet_type(i) != PT_SETUP);
     
