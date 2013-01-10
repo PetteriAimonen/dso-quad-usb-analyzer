@@ -5,13 +5,13 @@ static bool: filter_pre;
 
 const addrfiltmode: {
     ADDRFILT_NONE = 0,
-//    ADDRFILT_SETADDR = 1,
-    ADDRFILT_RANGE = 1,
-    ADDRFILT_RANGE0 = 2
+    ADDRFILT_SETADDR = 1,
+    ADDRFILT_RANGE = 2,
+    ADDRFILT_RANGE0 = 3
 }
 
 static addrfiltmode: addrfilt_mode;
-static addrfilt_mode_labels[]{} = ["None", "Range", "Range + addr 0"];
+static addrfilt_mode_labels[]{} = ["None", "Automatic", "Range", "Range + addr 0"];
 static minaddr, maxaddr;
 
 const repfiltmode: {
@@ -38,11 +38,11 @@ configure(bool: load_only = false)
             .help = "PREamble packets signify low-speed communication. This program doesn't support decoding them yet, so you probably want to filter them.");
         
         config_multichoice("addrfilt_mode", "Address filter mode",
-            addrfilt_mode, addrfilt_mode_labels, ADDRFILT_NONE,  .count = 3,
+            addrfilt_mode, addrfilt_mode_labels, ADDRFILT_SETADDR,  .count = 4,
             .help = "If there are many devices on the same root hub port, packets send by the host to any device will be visible. Filtering by the device address helps here." ...
-         //   "\n\nAutomatic mode will filter to the newest enumerated device." ...
-            "\nRange will just compare the address to a range you set." ...
-            "\nRange + addr 0 additionally always allows address 0 through, so that you can see the enumeration.");
+            "\n\nAutomatic mode will filter to the newest enumerated device. " ...
+            "Range will just compare the address to a range you set. " ...
+            "Range + addr 0 additionally always allows address 0 through, so that you can see the enumeration.");
         
         if (addrfilt_mode == ADDRFILT_RANGE
             || addrfilt_mode == ADDRFILT_RANGE0
@@ -73,6 +73,7 @@ configure(bool: load_only = false)
     if (filter_pre) DECODER_CONFIG |= IGNORE_PRE;
     if (repfilt_mode == REPFILT_HARD) DECODER_CONFIG |= REPEATFILT;
     if (addrfilt_mode == ADDRFILT_RANGE0) DECODER_CONFIG |= PASSZERO;
+    if (addrfilt_mode == ADDRFILT_SETADDR) DECODER_CONFIG |= FOLLOWADDR;
     
     if (addrfilt_mode == ADDRFILT_NONE)
     {

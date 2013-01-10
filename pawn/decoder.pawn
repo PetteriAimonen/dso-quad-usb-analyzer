@@ -9,6 +9,7 @@ const decoderconf: {
     ENABLE_USB      = 0x0002
     REPEATFILT      = 0x0004, // Enable repeat filter
     PASSZERO        = 0x0008, // Always pass addr 0
+    FOLLOWADDR      = 0x0010, // Follow setaddr
     IGNORE_SOF      = 0x0100,
     IGNORE_PRE      = 0x0200
 }
