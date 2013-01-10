@@ -54,7 +54,6 @@ begin
                 write_in <= '1';
                 clock;
                 write_in <= '0';
-                clock; clock; clock; clock;
             end loop;
             
             hread(line_in, byte);

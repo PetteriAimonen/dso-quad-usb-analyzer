@@ -33,19 +33,20 @@ architecture rtl of AddrFollower is
         WAITEND, SETUP, DATA, ACK
     );
     
-    subtype byte_t is std_logic_vector(7 downto 0);
-    type packet_t is array (natural range<>) of byte_t;
+    constant setup_c : std_logic_vector(0 to 7 * 8 + 7) :=
+        X"2D00000000000000";
+    constant setup_mask_c : std_logic_vector(0 to 7) :=
+         "10000001";
     
-    constant setup_c : packet_t(0 to 7) :=
-        (0 => X"2D", 7 => X"00", others => (others => '-'));
+    constant data_c : std_logic_vector(0 to 15 * 8 + 7) :=
+        X"C3000500000000000000000000000000";
+    constant data_mask_c : std_logic_vector(0 to 15) :=
+        "1110111110000001";
     
-    constant data_c : packet_t(0 to 15) :=
-        (0 => X"C3", 1 => X"00", 2 => X"05",
-         4 => X"00", 5 => X"00", 6 => X"00", 7 => X"00",
-         8 => X"00", 15 => X"00", others => (others => '-'));
-    
-    constant ack_c : packet_t(0 to 5) :=
-        (0 => X"D2", 5 => X"00", others => (others => '-'));
+    constant ack_c : std_logic_vector(0 to 5 * 8 + 7) :=
+        X"D20000000000";
+    constant ack_mask_c : std_logic_vector(0 to 5) :=
+        "100001";
     
     signal state_r:     PacketState;
     signal index_r:     integer range 0 to 15;
@@ -72,7 +73,8 @@ begin
                         end if;
                 
                     when SETUP =>
-                        if not std_match(data_in(7 downto 0), setup_c(index_r)) then
+                        if setup_mask_c(index_r) = '1' and
+                           data_in(7 downto 0) /= setup_c(index_r * 8 to index_r * 8 + 7) then
                             state_r <= WAITEND;
                         end if;
                         
@@ -88,7 +90,8 @@ begin
                         end if;
                     
                     when DATA =>
-                        if not std_match(data_in(7 downto 0), data_c(index_r)) then
+                        if data_mask_c(index_r) = '1' and
+                           data_in(7 downto 0) /= data_c(index_r * 8 to index_r * 8 + 7) then
                             state_r <= WAITEND;
                         end if;
                         
@@ -108,7 +111,8 @@ begin
                         end if;
                     
                     when ACK =>
-                        if not std_match(data_in(7 downto 0), ack_c(index_r)) then
+                        if ack_mask_c(index_r) = '1' and
+                           data_in(7 downto 0) /= ack_c(index_r * 8 to index_r * 8 + 7) then
                             state_r <= WAITEND;
                         end if;
                         
