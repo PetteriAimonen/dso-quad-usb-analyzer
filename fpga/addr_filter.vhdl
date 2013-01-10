@@ -43,6 +43,8 @@ begin
         if rst_n = '0' then
             state_r <= PID;
             addr_ok_r <= '1';
+            pid_r <= (others => '0');
+            addr_r <= (others => '0');
             data_out <= (others => '0');
             write_out <= '0';
         elsif rising_edge(clk) then
